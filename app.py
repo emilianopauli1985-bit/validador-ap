@@ -19,14 +19,12 @@ st.markdown(
         background-attachment: fixed;
     }
     
-    /* Fondito blanco semitransparente para que los carteles y tablas se lean bien */
     .stAlert, [data-testid="stDataFrame"] {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 10px;
         padding: 10px;
     }
 
-    /* Color blanco para los títulos y textos fuera de cajas blancas */
     label[data-testid="stWidgetLabel"] p, .stTabs [data-baseweb="tab"] {
         color: white !important;
         font-size: 16px !important;
@@ -34,7 +32,6 @@ st.markdown(
         text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
 
-    /* TRUCO CSS: Ocultar texto en inglés del botón y poner español */
     [data-testid="stFileUploadDropzone"] button {
         color: transparent !important;
     }
@@ -48,7 +45,6 @@ st.markdown(
         font-weight: 500;
     }
     
-    /* TRUCO CSS: Ocultar límite en inglés y poner español */
     [data-testid="stFileUploadDropzone"] small {
         color: transparent !important;
     }
@@ -94,22 +90,20 @@ with tab_armador:
             
             col_map1, col_map2, col_map3 = st.columns(3)
             with col_map1:
-                col_dni = st.selectbox("Columna de DNI:", opciones=columnas_disponibles)
+                # ACÁ ESTÁ EL CAMBIO: options en lugar de opciones
+                col_dni = st.selectbox("Columna de DNI:", options=columnas_disponibles)
             with col_map2:
-                col_nombre = st.selectbox("Columna de Nombre y Apellido:", opciones=columnas_disponibles)
+                col_nombre = st.selectbox("Columna de Nombre y Apellido:", options=columnas_disponibles)
             with col_map3:
-                col_fecha = st.selectbox("Columna de Fecha de Nacimiento:", opciones=columnas_disponibles)
+                col_fecha = st.selectbox("Columna de Fecha de Nacimiento:", options=columnas_disponibles)
                 
             if st.button("Procesar y Generar Plantilla Oficial"):
-                # Columnas exactas de la plantilla oficial
                 columnas_oficiales = ['MF', '*Tipo Id.', '*Nro. Id.', '*Fecha de Nacimiento', '*Apellido', '*Nombre', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
                 df_oficial = pd.DataFrame(columns=columnas_oficiales)
                 
-                # Procesar DNI
                 if col_dni != "No incluir":
                     df_oficial['*Nro. Id.'] = df_crudo[col_dni].astype(str).apply(lambda x: re.sub(r'[^0-9]', '', x) if x.lower() != 'nan' else '')
                 
-                # Procesar Nombres y Apellidos
                 if col_nombre != "No incluir":
                     apellidos = []
                     nombres = []
@@ -133,7 +127,6 @@ with tab_armador:
                     df_oficial['*Apellido'] = apellidos
                     df_oficial['*Nombre'] = nombres
                 
-                # Procesar Fechas
                 if col_fecha != "No incluir":
                     fechas_limpias = []
                     for f in df_crudo[col_fecha]:
@@ -151,7 +144,6 @@ with tab_armador:
                                 fechas_limpias.append(f_str)
                     df_oficial['*Fecha de Nacimiento'] = fechas_limpias
 
-                # Autocompletar valores por defecto
                 df_oficial['*Tipo Id.'] = 'D.N.I.'
                 df_oficial['*Nacionalidad'] = 'ARGENTINA'
                 df_oficial['*Incapacidad'] = 'NO'
@@ -361,4 +353,4 @@ with tab_validador:
             )
 
         except Exception as e:
-            st.error(f"Error al leer el archivo. Detalle técnico: {e}")
+            st
