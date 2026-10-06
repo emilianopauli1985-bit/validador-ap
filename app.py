@@ -25,7 +25,6 @@ st.markdown(
         padding: 10px;
     }
 
-    /* Color blanco para los títulos normales (fuera de las pestañas) */
     label[data-testid="stWidgetLabel"] p {
         color: white !important;
         font-size: 16px !important;
@@ -33,47 +32,51 @@ st.markdown(
         text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
 
-    /* --- NUEVO: ESTILO PREMIUM PARA PESTAÑAS (TIPO BOTONES REDONDEADOS) --- */
+    /* --- NUEVO: CSS AGRESIVO PARA FORZAR BOTONES OVALADOS --- */
     
-    /* Contenedor principal de las pestañas */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 15px;
-        background-color: rgba(0, 0, 0, 0.15); /* Fondo oscuro sutil para agrupar */
-        padding: 8px;
-        border-radius: 50px; /* Bordes redondeados modernos */
-        border: none;
-        margin-bottom: 10px;
+    /* 1. Fondo contenedor de los botones */
+    div[data-baseweb="tab-list"] {
+        background-color: rgba(0, 0, 0, 0.2) !important;
+        padding: 8px !important;
+        border-radius: 50px !important;
+        gap: 10px !important;
+        border: none !important;
+    }
+
+    /* 2. Ocultar OBLIGATORIAMENTE la raya inferior de Streamlit */
+    div[data-baseweb="tab-highlight"], 
+    div[data-baseweb="tab-border"] {
+        display: none !important;
+        background-color: transparent !important;
+        height: 0px !important;
+    }
+
+    /* 3. Forma base de TODOS los botones */
+    button[data-baseweb="tab"] {
+        background-color: transparent !important;
+        border-radius: 50px !important;
+        border: none !important;
+        padding: 8px 24px !important;
+        margin: 0 !important;
     }
     
-    /* Pestañas inactivas */
-    .stTabs [data-baseweb="tab"] {
-        background-color: transparent !important;
-        border-radius: 50px !important; /* Forma de píldora */
-        padding: 10px 24px !important;
+    /* 4. Letras de las pestañas inactivas */
+    button[data-baseweb="tab"] p {
         color: white !important;
         font-size: 16px !important;
-        font-weight: bold !important;
-        border: none !important;
-        transition: all 0.3s ease;
+        font-weight: 600 !important;
+    }
+
+    /* 5. Botón Seleccionado (Fondo blanco redondo) */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
     }
     
-    /* Efecto al pasar el mouse por encima */
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: rgba(255, 255, 255, 0.15) !important;
-    }
-    
-    /* Pestaña ACTIVA */
-    .stTabs [aria-selected="true"] {
-        background-color: white !important;
-        color: #b71c1c !important; /* Letra roja corporativa */
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important; /* Sombra elegante */
+    /* 6. Letras del Botón Seleccionado (Rojo) */
+    button[data-baseweb="tab"][aria-selected="true"] p {
+        color: #b71c1c !important;
         text-shadow: none !important;
-    }
-    
-    /* Ocultar las líneas por defecto feas de Streamlit */
-    .stTabs [data-baseweb="tab-highlight"], 
-    .stTabs [data-baseweb="tab-border"] {
-        display: none !important;
     }
     /* ------------------------------------------------------------- */
 
