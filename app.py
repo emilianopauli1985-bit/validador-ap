@@ -23,6 +23,7 @@ st.markdown(
     .stAlert, [data-testid="stDataFrame"] {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 10px;
+        padding: 10px;
     }
 
     /* Título del uploader en color blanco */
@@ -66,13 +67,12 @@ st.markdown(
 st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Validador de Solicitudes AP - Personas x Grupo</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6);">Subí tu Excel para controlar que no tenga errores antes de enviarlo a emisión.</p>', unsafe_allow_html=True)
 
-# Achicamos el ancho del uploader usando columnas (ocupa el 40% de la pantalla)
+# Achicamos el ancho del uploader usando columnas
 col1, col2 = st.columns([2, 3])
 
 with col1:
     archivo_agente = st.file_uploader("Seleccioná el archivo Excel (.xlsx)", type=["xlsx"])
 
-# A partir de acá, el código de validación sigue exactamente igual
 if archivo_agente is not None:
     try:
         # Leer el archivo del agente
@@ -216,19 +216,30 @@ if archivo_agente is not None:
         errores_totales = sum(tiene_error_fila)
         
         if total_fechas_mal_formato > 0:
-            st.success(f"🪄 **Autocorrección Inteligente:** Se detectaron {total_fechas_mal_formato} fechas de nacimiento mal escritas. El sistema logró corregir automáticamente {total_fechas_corregidas} de ellas.")
+            st.success(f"🪄 **Autocorrección Inteligente:** Se detectaron {total_fechas_mal_formato} fechas mal escritas. El sistema logró corregir automáticamente {total_fechas_corregidas} de ellas.")
         
         if errores_totales == 0:
             st.success("✅ ¡Excelente! El archivo ya no tiene errores y está listo para enviar.")
         else:
             st.error(f"❌ Se encontraron {errores_totales} filas con errores que requieren intervención manual.")
             
-            st.markdown("### 📊 Detalle de Errores Restantes:")
+            # --- NUEVO: Cuadro blanco para el texto de detalles ---
+            html_resumen = f"""
+            <div style="background-color: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 10px; color: #333; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h3 style="color: #d32f2f; margin-top: 0;">📊 Detalle de Errores Restantes:</h3>
+                <ul style="font-size: 16px;">
+            """
             for error_texto, cantidad in conteo_errores.most_common():
-                st.write(f"- **{cantidad}** x {error_texto}")
+                html_resumen += f"<li><b>{cantidad}</b> x {error_texto}</li>"
                 
-            st.write("---")
-            st.write("Vista previa (descargá el Excel para ver todos los detalles y usar los filtros):")
+            html_resumen += """
+                </ul>
+                <hr style="border-top: 1px solid #ccc;">
+                <p style="margin-bottom: 0;"><b>Vista previa</b> (descargá el Excel para ver todos los detalles y usar los filtros):</p>
+            </div>
+            """
+            st.markdown(html_resumen, unsafe_allow_html=True)
+            
             st.dataframe(df[df['Estado Fila'] == "❌ ERROR"][['Estado Fila', '*Nro. Id.', '*Apellido'] + columnas_con_errores])
 
         df['*Fecha de Nacimiento'] = pd.to_datetime(df['*Fecha de Nacimiento'], errors='ignore').dt.date
