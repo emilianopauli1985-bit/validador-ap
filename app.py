@@ -8,7 +8,7 @@ import re
 # Configuración de la página
 st.set_page_config(page_title="Validador de Cargas AP", layout="wide")
 
-# Fondo de pantalla con tu imagen
+# Fondo de pantalla y estilos de colores/traducción
 st.markdown(
     """
     <style>
@@ -18,23 +18,61 @@ st.markdown(
         background-position: center;
         background-attachment: fixed;
     }
-    /* Hacemos que los recuadros de texto tengan un fondo levemente blanco para que se lean bien sobre la imagen */
-    .stMarkdown, .stInfo, .stSuccess, .stError {
-        background-color: rgba(255, 255, 255, 0.85);
-        padding: 10px;
+    
+    /* Fondito blanco semitransparente para que los carteles y la tabla se lean bien */
+    .stAlert, [data-testid="stDataFrame"] {
+        background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 10px;
+    }
+
+    /* Título del uploader en color blanco */
+    label[data-testid="stWidgetLabel"] p {
+        color: white !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
+    }
+
+    /* TRUCO CSS: Ocultar texto en inglés del botón y poner español */
+    [data-testid="stFileUploadDropzone"] button {
+        color: transparent !important;
+    }
+    [data-testid="stFileUploadDropzone"] button::after {
+        content: "Subir archivo";
+        color: #262730;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-weight: 500;
+    }
+    
+    /* TRUCO CSS: Ocultar límite en inglés y poner español */
+    [data-testid="stFileUploadDropzone"] small {
+        color: transparent !important;
+    }
+    [data-testid="stFileUploadDropzone"] small::after {
+        content: "Límite 200MB • XLSX";
+        color: rgba(49, 51, 63, 0.6);
+        display: block;
+        margin-top: -15px;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-st.title("Validador de Solicitudes AP - Personas x Grupo")
-st.write("Subí tu Excel para controlar que no tenga errores antes de enviarlo a emisión.")
+# Título y subtítulo forzados en color blanco
+st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Validador de Solicitudes AP - Personas x Grupo</h1>', unsafe_allow_html=True)
+st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6);">Subí tu Excel para controlar que no tenga errores antes de enviarlo a emisión.</p>', unsafe_allow_html=True)
 
-# Subida del archivo por el agente
-archivo_agente = st.file_uploader("Seleccioná el archivo Excel (.xlsx)", type=["xlsx"])
+# Achicamos el ancho del uploader usando columnas (ocupa el 40% de la pantalla)
+col1, col2 = st.columns([2, 3])
 
+with col1:
+    archivo_agente = st.file_uploader("Seleccioná el archivo Excel (.xlsx)", type=["xlsx"])
+
+# A partir de acá, el código de validación sigue exactamente igual
 if archivo_agente is not None:
     try:
         # Leer el archivo del agente
@@ -43,11 +81,9 @@ if archivo_agente is not None:
 
         hoy = pd.Timestamp.today()
         
-        # Contadores de autocorrección
         total_fechas_mal_formato = 0
         total_fechas_corregidas = 0
         
-        # Diccionarios separados por categoría
         errores_col = {
             'Err_TipoId': [''] * len(df),
             'Err_NroId': [''] * len(df),
@@ -60,15 +96,12 @@ if archivo_agente is not None:
             'Err_Nacionalidad': [''] * len(df)
         }
 
-        # Aplicar reglas fila por fila
         for index, row in df.iterrows():
             
-            # 1. Tipo Id.
             tipo_id = str(row.get('*Tipo Id.', '')).strip().upper()
             if pd.isna(row.get('*Tipo Id.')) or tipo_id == 'NAN' or not tipo_id:
                 errores_col['Err_TipoId'][index] = "Falta seleccionar D.N.I. o Pasaporte"
             
-            # 2. Nro. Id.
             nro_id = row.get('*Nro. Id.')
             nro_id_str = str(nro_id).strip()
             
@@ -81,26 +114,19 @@ if archivo_agente is not None:
                     if not nro_id_str.isdigit() or nro_id_str.startswith('0'):
                         errores_col['Err_NroId'][index] = "Pasaporte inicia con 0 o tiene letras"
             
-            # 3. Fecha de Nacimiento (Con Autocorrección)
             fecha_nac = row.get('*Fecha de Nacimiento')
             if pd.notna(fecha_nac):
                 es_valida = True
                 
-                # Si no es una fecha nativa de Excel, intentamos corregirla
                 if not isinstance(fecha_nac, pd.Timestamp) and not isinstance(fecha_nac, datetime):
                     total_fechas_mal_formato += 1
                     fecha_str = str(fecha_nac)
-                    
-                    # Limpieza inteligente: dejamos solo los números
                     numeros = re.sub(r'[^0-9]', '', fecha_str)
                     corregida = False
                     
-                    # Si al limpiar quedan 8 números exactos (DDMMAAAA)
                     if len(numeros) == 8:
                         try:
-                            # Intentamos convertir forzando formato Día/Mes/Año
                             fecha_limpia = pd.to_datetime(numeros, format='%d%m%Y')
-                            # Reemplazamos la celda original para que se descargue bien
                             df.at[index, '*Fecha de Nacimiento'] = fecha_limpia
                             fecha_nac = fecha_limpia
                             corregida = True
@@ -108,12 +134,10 @@ if archivo_agente is not None:
                         except:
                             pass
                     
-                    # Si a pesar de todo no se pudo corregir, marcamos error
                     if not corregida:
                         errores_col['Err_FechaNac'][index] = "Fecha en formato texto irreconocible"
                         es_valida = False
 
-                # Si es una fecha válida (o si logramos corregirla recién), validamos la lógica de negocio
                 if es_valida and (isinstance(fecha_nac, pd.Timestamp) or isinstance(fecha_nac, datetime)):
                     if fecha_nac > hoy:
                         errores_col['Err_FechaNac'][index] = "Fecha futura"
@@ -122,7 +146,6 @@ if archivo_agente is not None:
                         if edad < 15:
                             errores_col['Err_FechaNac'][index] = "Menor de 15 años"
                             
-            # 4. Sumas Aseguradas
             if pd.isna(row.get('*S.A. Individual Muerte')): errores_col['Err_SAMuerte'][index] = "S.A. Muerte vacía"
             else:
                 try: float(row.get('*S.A. Individual Muerte'))
@@ -138,12 +161,10 @@ if archivo_agente is not None:
                 try: float(row.get('S.A. AMF'))
                 except: errores_col['Err_SAAMF'][index] = "S.A. AMF no es número"
                     
-            # 5. Incapacidad
             incap = str(row.get('*Incapacidad')).strip().upper()
             if incap not in ['SI', 'NO']:
                 errores_col['Err_Incapacidad'][index] = "Incapacidad debe ser SI o NO"
                 
-            # 6. Ocupación y Nacionalidad
             ocup = str(row.get('*Ocupación')).strip().upper()
             if pd.isna(row.get('*Ocupación')) or ocup == 'NAN' or not ocup:
                 errores_col['Err_Ocupacion'][index] = "Ocupación vacía"
@@ -152,7 +173,6 @@ if archivo_agente is not None:
             if pd.isna(row.get('*Nacionalidad')) or nac == 'NAN' or not nac:
                 errores_col['Err_Nacionalidad'][index] = "Nacionalidad vacía"
 
-        # Control de Duplicados DNI
         nro_ids = df['*Nro. Id.'].dropna().astype(str).tolist()
         dups = set([x for x in nro_ids if nro_ids.count(x) > 1])
 
@@ -162,7 +182,6 @@ if archivo_agente is not None:
                 actual = errores_col['Err_NroId'][index]
                 errores_col['Err_NroId'][index] = "DNI duplicado" if not actual else actual + " / DNI duplicado"
 
-        # --- CONTABILIZADOR DE TIPOS DE ERRORES ---
         lista_todos_errores = []
         for categoria, lista_err in errores_col.items():
             for error in lista_err:
@@ -172,7 +191,6 @@ if archivo_agente is not None:
         
         conteo_errores = Counter(lista_todos_errores)
 
-        # --- ESTRUCTURAR EL EXCEL PARA FILTROS ---
         tiene_error_fila = [False] * len(df)
         mapa_nombres = {
             'Err_TipoId': 'Error: Tipo Id',
@@ -197,9 +215,6 @@ if archivo_agente is not None:
         df.insert(0, 'Estado Fila', ["❌ ERROR" if e else "✅ OK" for e in tiene_error_fila])
         errores_totales = sum(tiene_error_fila)
         
-        # --- RESULTADOS VISUALES EN PANTALLA ---
-        
-        # Módulo de aviso de autocorrección
         if total_fechas_mal_formato > 0:
             st.success(f"🪄 **Autocorrección Inteligente:** Se detectaron {total_fechas_mal_formato} fechas de nacimiento mal escritas. El sistema logró corregir automáticamente {total_fechas_corregidas} de ellas.")
         
@@ -208,7 +223,6 @@ if archivo_agente is not None:
         else:
             st.error(f"❌ Se encontraron {errores_totales} filas con errores que requieren intervención manual.")
             
-            # Mostrar el resumen de los errores específicos
             st.markdown("### 📊 Detalle de Errores Restantes:")
             for error_texto, cantidad in conteo_errores.most_common():
                 st.write(f"- **{cantidad}** x {error_texto}")
@@ -217,10 +231,8 @@ if archivo_agente is not None:
             st.write("Vista previa (descargá el Excel para ver todos los detalles y usar los filtros):")
             st.dataframe(df[df['Estado Fila'] == "❌ ERROR"][['Estado Fila', '*Nro. Id.', '*Apellido'] + columnas_con_errores])
 
-        # Formatear la fecha en Excel para que no muestre la hora si fue corregida
         df['*Fecha de Nacimiento'] = pd.to_datetime(df['*Fecha de Nacimiento'], errors='ignore').dt.date
         
-        # Botón de descarga con colores
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             df.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
