@@ -25,12 +25,44 @@ st.markdown(
         padding: 10px;
     }
 
-    label[data-testid="stWidgetLabel"] p, .stTabs [data-baseweb="tab"] {
+    /* Color blanco para los títulos normales (fuera de las pestañas) */
+    label[data-testid="stWidgetLabel"] p {
         color: white !important;
         font-size: 16px !important;
         font-weight: bold !important;
         text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
+
+    /* --- NUEVO: ESTILO PARA HACER LAS PESTAÑAS SÚPER VISIBLES --- */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px; /* Separación entre botones */
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: rgba(255, 255, 255, 0.15) !important; /* Fondo semitransparente para la inactiva */
+        border-radius: 8px 8px 0px 0px !important;
+        padding: 10px 25px !important;
+        color: white !important; /* Texto blanco en la inactiva */
+        font-size: 18px !important;
+        font-weight: bold !important;
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        border-bottom: none !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: rgba(255, 255, 255, 0.95) !important; /* Blanco sólido para la activa */
+        color: #b71c1c !important; /* Texto rojo oscuro para contraste */
+        text-shadow: none !important;
+        border: 1px solid white !important;
+    }
+    
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: transparent !important; /* Oculta la rayita azul por defecto */
+    }
+    .stTabs [data-baseweb="tab-border"] {
+        background-color: rgba(255, 255, 255, 0.5) !important;
+    }
+    /* ------------------------------------------------------------- */
 
     [data-testid="stFileUploadDropzone"] button {
         color: transparent !important;
