@@ -71,7 +71,6 @@ tab_armador, tab_validador = st.tabs(["🪄 Armar Excel (Limpiador)", "✅ Valid
 with tab_armador:
     st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Subí el Excel desordenado que te envió la empresa. Podés indicarle al sistema en qué fila empiezan los títulos para saltear logos o membretes.</div>', unsafe_allow_html=True)
     
-    # NUEVO: Selector de fila de inicio
     col_fila, col_espacio = st.columns([2, 3])
     with col_fila:
         fila_titulos = st.number_input("¿En qué fila del Excel están los títulos de las columnas? (Cambiá este número si hay títulos o logos arriba)", min_value=1, value=1)
@@ -82,14 +81,12 @@ with tab_armador:
     
     if archivo_crudo is not None:
         try:
-            # NUEVO: Lee el archivo saltando las filas basura de arriba
             filas_a_saltar = int(fila_titulos) - 1
             if archivo_crudo.name.endswith('.csv'):
                 df_crudo = pd.read_csv(archivo_crudo, skiprows=filas_a_saltar)
             else:
                 df_crudo = pd.read_excel(archivo_crudo, skiprows=filas_a_saltar)
             
-            # NUEVO: Borramos las filas que estén 100% vacías para evitar errores de sistema
             df_crudo = df_crudo.dropna(how='all')
                 
             columnas_disponibles = ["No incluir"] + list(df_crudo.columns)
@@ -110,11 +107,9 @@ with tab_armador:
                 columnas_oficiales = ['MF', '*Tipo Id.', '*Nro. Id.', '*Fecha de Nacimiento', '*Apellido', '*Nombre', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
                 df_oficial = pd.DataFrame(columns=columnas_oficiales)
                 
-                # Procesar DNI (Ahora con conversión 100% segura a string)
                 if col_dni != "No incluir":
                     df_oficial['*Nro. Id.'] = df_crudo[col_dni].apply(lambda x: re.sub(r'[^0-9]', '', str(x)) if str(x).lower() != 'nan' and pd.notna(x) else '')
                 
-                # Procesar Nombres y Apellidos
                 if col_nombre != "No incluir":
                     apellidos = []
                     nombres = []
@@ -138,7 +133,6 @@ with tab_armador:
                     df_oficial['*Apellido'] = apellidos
                     df_oficial['*Nombre'] = nombres
                 
-                # Procesar Fechas
                 if col_fecha != "No incluir":
                     fechas_limpias = []
                     for f in df_crudo[col_fecha]:
@@ -164,7 +158,9 @@ with tab_armador:
                 st.dataframe(df_oficial)
                 
                 buffer_armado = io.BytesIO()
-                with pd.ExcelWriter(buffer_armado, engine='xlsxwriter') as writer:
+                
+                # --- AQUÍ APLICAMOS EL FORMATO DD/MM/YYYY PARA EL ARMADOR ---
+                with pd.ExcelWriter(buffer_armado, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
                     df_oficial.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
                 
                 st.download_button(
@@ -232,137 +228,4 @@ with tab_validador:
                                 df.at[index, '*Fecha de Nacimiento'] = fecha_limpia
                                 fecha_nac = fecha_limpia
                                 corregida = True
-                                total_fechas_corregidas += 1
-                            except:
-                                pass
-                        
-                        if not corregida:
-                            errores_col['Err_FechaNac'][index] = "Fecha en formato texto irreconocible"
-                            es_valida = False
-
-                    if es_valida and (isinstance(fecha_nac, pd.Timestamp) or isinstance(fecha_nac, datetime)):
-                        if fecha_nac > hoy:
-                            errores_col['Err_FechaNac'][index] = "Fecha futura"
-                        else:
-                            edad = hoy.year - fecha_nac.year - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
-                            if edad < 15:
-                                errores_col['Err_FechaNac'][index] = "Menor de 15 años"
-                                
-                if pd.isna(row.get('*S.A. Individual Muerte')): errores_col['Err_SAMuerte'][index] = "S.A. Muerte vacía"
-                else:
-                    try: float(row.get('*S.A. Individual Muerte'))
-                    except: errores_col['Err_SAMuerte'][index] = "S.A. Muerte no es número"
-
-                if pd.isna(row.get('S.A. Individual Inválidez')): errores_col['Err_SAInvalidez'][index] = "S.A. Invalidez vacía"
-                else:
-                    try: float(row.get('S.A. Individual Inválidez'))
-                    except: errores_col['Err_SAInvalidez'][index] = "S.A. Invalidez no es número"
-
-                if pd.isna(row.get('S.A. AMF')): errores_col['Err_SAAMF'][index] = "S.A. AMF vacía"
-                else:
-                    try: float(row.get('S.A. AMF'))
-                    except: errores_col['Err_SAAMF'][index] = "S.A. AMF no es número"
-                        
-                incap = str(row.get('*Incapacidad')).strip().upper()
-                if incap not in ['SI', 'NO']:
-                    errores_col['Err_Incapacidad'][index] = "Incapacidad debe ser SI o NO"
-                    
-                ocup = str(row.get('*Ocupación')).strip().upper()
-                if pd.isna(row.get('*Ocupación')) or ocup == 'NAN' or not ocup:
-                    errores_col['Err_Ocupacion'][index] = "Ocupación vacía"
-                    
-                nac = str(row.get('*Nacionalidad')).strip().upper()
-                if pd.isna(row.get('*Nacionalidad')) or nac == 'NAN' or not nac:
-                    errores_col['Err_Nacionalidad'][index] = "Nacionalidad vacía"
-
-            nro_ids = df['*Nro. Id.'].dropna().astype(str).tolist()
-            dups = set([x for x in nro_ids if nro_ids.count(x) > 1])
-
-            for index, row in df.iterrows():
-                nro_id = str(row.get('*Nro. Id.'))
-                if nro_id in dups:
-                    actual = errores_col['Err_NroId'][index]
-                    errores_col['Err_NroId'][index] = "DNI duplicado" if not actual else actual + " / DNI duplicado"
-
-            lista_todos_errores = []
-            for categoria, lista_err in errores_col.items():
-                for error in lista_err:
-                    if error != '':
-                        for sub_error in error.split(" / "):
-                            lista_todos_errores.append(sub_error)
-            
-            conteo_errores = Counter(lista_todos_errores)
-
-            tiene_error_fila = [False] * len(df)
-            mapa_nombres = {
-                'Err_TipoId': 'Error: Tipo Id', 'Err_NroId': 'Error: Nro Id', 'Err_FechaNac': 'Error: Fecha Nac',
-                'Err_SAMuerte': 'Error: SA Muerte', 'Err_SAInvalidez': 'Error: SA Invalidez', 'Err_SAAMF': 'Error: SA AMF',
-                'Err_Incapacidad': 'Error: Incapacidad', 'Err_Ocupacion': 'Error: Ocupación', 'Err_Nacionalidad': 'Error: Nacionalidad'
-            }
-
-            columnas_con_errores = []
-            for clave, nombre_col in mapa_nombres.items():
-                if any(errores_col[clave]): 
-                    df[nombre_col] = errores_col[clave]
-                    columnas_con_errores.append(nombre_col)
-                    for i, val in enumerate(errores_col[clave]):
-                        if val != '': tiene_error_fila[i] = True
-
-            df.insert(0, 'Estado Fila', ["❌ ERROR" if e else "✅ OK" for e in tiene_error_fila])
-            errores_totales = sum(tiene_error_fila)
-            
-            if total_fechas_mal_formato > 0:
-                st.success(f"🪄 **Autocorrección Inteligente:** Se detectaron {total_fechas_mal_formato} fechas mal escritas. El sistema logró corregir automáticamente {total_fechas_corregidas} de ellas.")
-            
-            if errores_totales == 0:
-                st.success("✅ ¡Excelente! El archivo ya no tiene errores y está listo para enviar.")
-            else:
-                st.error(f"❌ Se encontraron {errores_totales} filas con errores que requieren intervención manual.")
-                
-                html_resumen = f"""
-                <div style="background-color: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 10px; color: #333; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    <h3 style="color: #d32f2f; margin-top: 0;">📊 Detalle de Errores Restantes:</h3>
-                    <ul style="font-size: 16px;">
-                """
-                for error_texto, cantidad in conteo_errores.most_common():
-                    html_resumen += f"<li><b>{cantidad}</b> x {error_texto}</li>"
-                    
-                html_resumen += """
-                    </ul>
-                    <hr style="border-top: 1px solid #ccc;">
-                    <p style="margin-bottom: 0;"><b>Vista previa</b> (descargá el Excel para ver todos los detalles y usar los filtros):</p>
-                </div>
-                """
-                st.markdown(html_resumen, unsafe_allow_html=True)
-                
-                st.dataframe(df[df['Estado Fila'] == "❌ ERROR"][['Estado Fila', '*Nro. Id.', '*Apellido'] + columnas_con_errores])
-
-            df['*Fecha de Nacimiento'] = pd.to_datetime(df['*Fecha de Nacimiento'], errors='ignore').dt.date
-            
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
-                workbook = writer.book
-                worksheet = writer.sheets['AP - Personas x Grupo']
-                
-                formato_rojo = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
-                formato_verde = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100'})
-                formato_amarillo = workbook.add_format({'bg_color': '#FFF2CC', 'font_color': '#9C6500'})
-                
-                worksheet.conditional_format('A2:A5000', {'type': 'text', 'criteria': 'containing', 'value': 'ERROR', 'format': formato_rojo})
-                worksheet.conditional_format('A2:A5000', {'type': 'text', 'criteria': 'containing', 'value': 'OK', 'format': formato_verde})
-                worksheet.set_column(0, 0, 15) 
-                
-                if columnas_con_errores:
-                    idx_inicio = len(df.columns) - len(columnas_con_errores)
-                    worksheet.set_column(idx_inicio, len(df.columns)-1, 25, formato_amarillo)
-
-            st.download_button(
-                label="📥 Descargar Excel con Reporte de Errores" if errores_totales > 0 else "📥 Descargar Excel Validado",
-                data=buffer.getvalue(),
-                file_name="Control_AP_Reporte.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-        except Exception as e:
-            st.error(f"Error al leer el archivo. Detalle técnico: {e}")
+                                total_fechas
