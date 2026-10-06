@@ -3,9 +3,31 @@ import pandas as pd
 from datetime import datetime
 import io
 from collections import Counter
+import re
 
 # Configuración de la página
 st.set_page_config(page_title="Validador de Cargas AP", layout="wide")
+
+# Fondo de pantalla con tu imagen
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-image: url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/L2_Wallpaper-05.jpg");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }
+    /* Hacemos que los recuadros de texto tengan un fondo levemente blanco para que se lean bien sobre la imagen */
+    .stMarkdown, .stInfo, .stSuccess, .stError {
+        background-color: rgba(255, 255, 255, 0.85);
+        padding: 10px;
+        border-radius: 10px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 st.title("Validador de Solicitudes AP - Personas x Grupo")
 st.write("Subí tu Excel para controlar que no tenga errores antes de enviarlo a emisión.")
@@ -17,9 +39,13 @@ if archivo_agente is not None:
     try:
         # Leer el archivo del agente
         df = pd.read_excel(archivo_agente, sheet_name="AP - Personas x Grupo")
-        st.info("Procesando validaciones...")
+        st.info("Procesando validaciones y corrigiendo formatos...")
 
         hoy = pd.Timestamp.today()
+        
+        # Contadores de autocorrección
+        total_fechas_mal_formato = 0
+        total_fechas_corregidas = 0
         
         # Diccionarios separados por categoría
         errores_col = {
@@ -55,12 +81,40 @@ if archivo_agente is not None:
                     if not nro_id_str.isdigit() or nro_id_str.startswith('0'):
                         errores_col['Err_NroId'][index] = "Pasaporte inicia con 0 o tiene letras"
             
-            # 3. Fecha de Nacimiento
+            # 3. Fecha de Nacimiento (Con Autocorrección)
             fecha_nac = row.get('*Fecha de Nacimiento')
             if pd.notna(fecha_nac):
+                es_valida = True
+                
+                # Si no es una fecha nativa de Excel, intentamos corregirla
                 if not isinstance(fecha_nac, pd.Timestamp) and not isinstance(fecha_nac, datetime):
-                    errores_col['Err_FechaNac'][index] = "Fecha en formato texto"
-                else:
+                    total_fechas_mal_formato += 1
+                    fecha_str = str(fecha_nac)
+                    
+                    # Limpieza inteligente: dejamos solo los números
+                    numeros = re.sub(r'[^0-9]', '', fecha_str)
+                    corregida = False
+                    
+                    # Si al limpiar quedan 8 números exactos (DDMMAAAA)
+                    if len(numeros) == 8:
+                        try:
+                            # Intentamos convertir forzando formato Día/Mes/Año
+                            fecha_limpia = pd.to_datetime(numeros, format='%d%m%Y')
+                            # Reemplazamos la celda original para que se descargue bien
+                            df.at[index, '*Fecha de Nacimiento'] = fecha_limpia
+                            fecha_nac = fecha_limpia
+                            corregida = True
+                            total_fechas_corregidas += 1
+                        except:
+                            pass
+                    
+                    # Si a pesar de todo no se pudo corregir, marcamos error
+                    if not corregida:
+                        errores_col['Err_FechaNac'][index] = "Fecha en formato texto irreconocible"
+                        es_valida = False
+
+                # Si es una fecha válida (o si logramos corregirla recién), validamos la lógica de negocio
+                if es_valida and (isinstance(fecha_nac, pd.Timestamp) or isinstance(fecha_nac, datetime)):
                     if fecha_nac > hoy:
                         errores_col['Err_FechaNac'][index] = "Fecha futura"
                     else:
@@ -113,7 +167,6 @@ if archivo_agente is not None:
         for categoria, lista_err in errores_col.items():
             for error in lista_err:
                 if error != '':
-                    # Si hay errores múltiples en la misma celda separados por "/", los dividimos para contarlos bien
                     for sub_error in error.split(" / "):
                         lista_todos_errores.append(sub_error)
         
@@ -145,13 +198,18 @@ if archivo_agente is not None:
         errores_totales = sum(tiene_error_fila)
         
         # --- RESULTADOS VISUALES EN PANTALLA ---
+        
+        # Módulo de aviso de autocorrección
+        if total_fechas_mal_formato > 0:
+            st.success(f"🪄 **Autocorrección Inteligente:** Se detectaron {total_fechas_mal_formato} fechas de nacimiento mal escritas. El sistema logró corregir automáticamente {total_fechas_corregidas} de ellas.")
+        
         if errores_totales == 0:
-            st.success("✅ ¡Excelente! El archivo no tiene errores. Podés enviarlo.")
+            st.success("✅ ¡Excelente! El archivo ya no tiene errores y está listo para enviar.")
         else:
-            st.error(f"❌ Se encontraron {errores_totales} filas con errores en total.")
+            st.error(f"❌ Se encontraron {errores_totales} filas con errores que requieren intervención manual.")
             
             # Mostrar el resumen de los errores específicos
-            st.markdown("### 📊 Detalle de Errores Encontrados:")
+            st.markdown("### 📊 Detalle de Errores Restantes:")
             for error_texto, cantidad in conteo_errores.most_common():
                 st.write(f"- **{cantidad}** x {error_texto}")
                 
@@ -159,6 +217,9 @@ if archivo_agente is not None:
             st.write("Vista previa (descargá el Excel para ver todos los detalles y usar los filtros):")
             st.dataframe(df[df['Estado Fila'] == "❌ ERROR"][['Estado Fila', '*Nro. Id.', '*Apellido'] + columnas_con_errores])
 
+        # Formatear la fecha en Excel para que no muestre la hora si fue corregida
+        df['*Fecha de Nacimiento'] = pd.to_datetime(df['*Fecha de Nacimiento'], errors='ignore').dt.date
+        
         # Botón de descarga con colores
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
