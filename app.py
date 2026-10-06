@@ -32,53 +32,52 @@ st.markdown(
         text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
 
-    /* --- NUEVO: CSS AGRESIVO PARA FORZAR BOTONES OVALADOS --- */
+    /* ========================================================= */
+    /* DISEÑO DEFINITIVO DE LOS BOTONES (PESTAÑAS)               */
+    /* ========================================================= */
     
-    /* 1. Fondo contenedor de los botones */
-    div[data-baseweb="tab-list"] {
-        background-color: rgba(0, 0, 0, 0.2) !important;
-        padding: 8px !important;
-        border-radius: 50px !important;
-        gap: 10px !important;
-        border: none !important;
+    /* Contenedor de las pestañas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 15px !important;
+        background-color: transparent !important;
     }
 
-    /* 2. Ocultar OBLIGATORIAMENTE la raya inferior de Streamlit */
+    /* Pestaña INACTIVA (Gris oscuro con letra blanca) */
+    button[data-baseweb="tab"] {
+        background-color: rgba(0, 0, 0, 0.6) !important; 
+        border-radius: 8px !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        padding: 12px 24px !important;
+        margin: 0 !important;
+    }
+    
+    /* Texto de Pestaña INACTIVA (Más cuerpo) */
+    button[data-baseweb="tab"] div[data-testid="stMarkdownContainer"] p {
+        color: #FFFFFF !important;
+        font-size: 18px !important;
+        font-weight: 800 !important; /* Mucho cuerpo */
+    }
+
+    /* Pestaña ACTIVA (Fondo blanco sólido para que no se mezcle con el rojo) */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #FFFFFF !important;
+        border: 2px solid #FFFFFF !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.4) !important;
+    }
+    
+    /* Texto de Pestaña ACTIVA (Rojo oscuro) */
+    button[data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
+        color: #900000 !important; /* Bordó fuerte */
+        font-weight: 900 !important; /* Cuerpo máximo */
+    }
+
+    /* Ocultar las rayas nativas de Streamlit de una vez por todas */
     div[data-baseweb="tab-highlight"], 
     div[data-baseweb="tab-border"] {
         display: none !important;
         background-color: transparent !important;
-        height: 0px !important;
     }
-
-    /* 3. Forma base de TODOS los botones */
-    button[data-baseweb="tab"] {
-        background-color: transparent !important;
-        border-radius: 50px !important;
-        border: none !important;
-        padding: 8px 24px !important;
-        margin: 0 !important;
-    }
-    
-    /* 4. Letras de las pestañas inactivas */
-    button[data-baseweb="tab"] p {
-        color: white !important;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-    }
-
-    /* 5. Botón Seleccionado (Fondo blanco redondo) */
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-    }
-    
-    /* 6. Letras del Botón Seleccionado (Rojo) */
-    button[data-baseweb="tab"][aria-selected="true"] p {
-        color: #b71c1c !important;
-        text-shadow: none !important;
-    }
-    /* ------------------------------------------------------------- */
+    /* ========================================================= */
 
     [data-testid="stFileUploadDropzone"] button {
         color: transparent !important;
