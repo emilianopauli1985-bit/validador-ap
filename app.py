@@ -39,6 +39,7 @@ st.markdown(
     .stTabs [data-baseweb="tab-list"] {
         gap: 15px !important;
         background-color: transparent !important;
+        flex-wrap: wrap !important;
     }
 
     button[data-baseweb="tab"] {
@@ -90,7 +91,7 @@ st.markdown(
         color: transparent !important;
     }
     [data-testid="stFileUploadDropzone"] small::after {
-        content: "Límite 200MB • Excel/CSV";
+        content: "Límite 200MB • Excel/CSV/PDF";
         color: rgba(49, 51, 63, 0.6);
         display: block;
         margin-top: -15px;
@@ -100,11 +101,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Validador y Armador de Solicitudes AP</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente de Solicitudes AP</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
-# Creamos las dos pestañas
-tab_armador, tab_validador = st.tabs(["🪄 Armar Excel (Limpiador)", "✅ Validar Carga"])
+# Creamos las TRES pestañas
+tab_armador, tab_validador, tab_pdf = st.tabs(["🪄 Armar Excel (Limpiador)", "✅ Validar Carga", "📄 PDF a Excel / Word"])
 
 # ==========================================
 # PESTAÑA 1: ARMADOR / LIMPIADOR DE DATOS CRUDOS
@@ -214,7 +215,7 @@ with tab_armador:
             st.error(f"Error al procesar el archivo: {e}. Verificá que la fila de inicio sea la correcta.")
 
 # ==========================================
-# PESTAÑA 2: VALIDADOR ESTRICTO (Código Original)
+# PESTAÑA 2: VALIDADOR ESTRICTO
 # ==========================================
 with tab_validador:
     col1b, col2b = st.columns([2, 3])
@@ -373,7 +374,6 @@ with tab_validador:
                 
                 st.dataframe(df[df['Estado Fila'] == "❌ ERROR"][['Estado Fila', '*Nro. Id.', '*Apellido'] + columnas_con_errores])
 
-            # --- AQUÍ ESTABA EL ERROR: ESTA ES LA LÍNEA CORREGIDA A PRUEBA DE BALAS ---
             df['*Fecha de Nacimiento'] = df['*Fecha de Nacimiento'].apply(lambda x: x.date() if isinstance(x, (pd.Timestamp, datetime)) else x)
             
             buffer = io.BytesIO()
@@ -404,3 +404,86 @@ with tab_validador:
 
         except Exception as e:
             st.error(f"Error al leer el archivo. Detalle técnico: {e}")
+
+# ==========================================
+# PESTAÑA 3: CONVERTIDOR DE PDF
+# ==========================================
+with tab_pdf:
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Subí la nómina en PDF. Si el sistema detecta una tabla estructurada, generará un <b>Excel</b>. Si solo detecta texto suelto, generará un archivo de <b>Word</b> para que te sea más fácil copiar y pegar los datos.</div>', unsafe_allow_html=True)
+    
+    col1c, col2c = st.columns([2, 3])
+    with col1c:
+        archivo_pdf = st.file_uploader("Subí el PDF del cliente", type=["pdf"], key="uploader_pdf")
+    
+    if archivo_pdf is not None:
+        if st.button("🔍 Extraer Datos"):
+            try:
+                import pdfplumber
+                import docx
+            except ImportError:
+                st.error("❌ Faltan instalar librerías. Por favor, agregá las palabras 'pdfplumber' y 'python-docx' a tu archivo requirements.txt en GitHub (una debajo de la otra) y esperá a que la aplicación se reinicie.")
+            else:
+                with st.spinner("Escaneando PDF... esto puede demorar unos segundos."):
+                    todas_las_filas = []
+                    texto_crudo = []
+                    
+                    try:
+                        with pdfplumber.open(archivo_pdf) as pdf:
+                            for page in pdf.pages:
+                                # Intento A: Extraer como Tabla
+                                tablas = page.extract_tables()
+                                if tablas:
+                                    for tabla in tablas:
+                                        tabla_limpia = [[str(celda).strip() if celda is not None else "" for celda in fila] for fila in tabla]
+                                        todas_las_filas.extend(tabla_limpia)
+                                
+                                # Intento B (Backup): Extraer texto crudo
+                                texto = page.extract_text()
+                                if texto:
+                                    texto_crudo.extend(texto.split('\n'))
+                        
+                        st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px;">', unsafe_allow_html=True)
+                        
+                        if todas_las_filas:
+                            st.success("✅ ¡Se detectaron tablas estructuradas! Generando archivo Excel...")
+                            df_pdf = pd.DataFrame(todas_las_filas)
+                            st.write("**Vista Previa:**")
+                            st.dataframe(df_pdf.head(15))
+                            
+                            buffer_pdf = io.BytesIO()
+                            with pd.ExcelWriter(buffer_pdf, engine='xlsxwriter') as writer:
+                                df_pdf.to_excel(writer, index=False, header=False)
+                            
+                            st.download_button(
+                                label="📥 Descargar Tabla en Excel",
+                                data=buffer_pdf.getvalue(),
+                                file_name="PDF_Convertido.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+                            
+                        elif texto_crudo:
+                            st.warning("⚠️ El PDF no tenía formato de tabla. Se generó un archivo Word con el texto limpio para que puedas copiar y pegar.")
+                            
+                            # Crear el documento Word
+                            doc = docx.Document()
+                            doc.add_heading('Texto extraído del PDF', 0)
+                            for linea in texto_crudo:
+                                if linea.strip(): # Evitar líneas en blanco vacías
+                                    doc.add_paragraph(linea.strip())
+                                    
+                            buffer_word = io.BytesIO()
+                            doc.save(buffer_word)
+                            
+                            st.download_button(
+                                label="📝 Descargar Texto en Word (.docx)",
+                                data=buffer_word.getvalue(),
+                                file_name="PDF_Texto_Extraido.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            )
+                        else:
+                            st.error("No se detectaron textos ni tablas. Es probable que el PDF sea una foto o imagen escaneada.")
+                            
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                    except Exception as e:
+                        st.error(f"Ocurrió un error inesperado al leer el PDF: {e}")
