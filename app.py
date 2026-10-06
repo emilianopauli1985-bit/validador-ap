@@ -36,13 +36,11 @@ st.markdown(
     /* DISEÑO DEFINITIVO DE LOS BOTONES (PESTAÑAS)               */
     /* ========================================================= */
     
-    /* Contenedor de las pestañas */
     .stTabs [data-baseweb="tab-list"] {
         gap: 15px !important;
         background-color: transparent !important;
     }
 
-    /* Pestaña INACTIVA (Gris oscuro con letra blanca) */
     button[data-baseweb="tab"] {
         background-color: rgba(0, 0, 0, 0.6) !important; 
         border-radius: 8px !important;
@@ -51,27 +49,23 @@ st.markdown(
         margin: 0 !important;
     }
     
-    /* Texto de Pestaña INACTIVA (Más cuerpo) */
     button[data-baseweb="tab"] div[data-testid="stMarkdownContainer"] p {
         color: #FFFFFF !important;
         font-size: 18px !important;
-        font-weight: 800 !important; /* Mucho cuerpo */
+        font-weight: 800 !important; 
     }
 
-    /* Pestaña ACTIVA (Fondo blanco sólido para que no se mezcle con el rojo) */
     button[data-baseweb="tab"][aria-selected="true"] {
         background-color: #FFFFFF !important;
         border: 2px solid #FFFFFF !important;
         box-shadow: 0px 4px 10px rgba(0,0,0,0.4) !important;
     }
     
-    /* Texto de Pestaña ACTIVA (Rojo oscuro) */
     button[data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
-        color: #900000 !important; /* Bordó fuerte */
-        font-weight: 900 !important; /* Cuerpo máximo */
+        color: #900000 !important; 
+        font-weight: 900 !important; 
     }
 
-    /* Ocultar las rayas nativas de Streamlit de una vez por todas */
     div[data-baseweb="tab-highlight"], 
     div[data-baseweb="tab-border"] {
         display: none !important;
@@ -379,7 +373,8 @@ with tab_validador:
                 
                 st.dataframe(df[df['Estado Fila'] == "❌ ERROR"][['Estado Fila', '*Nro. Id.', '*Apellido'] + columnas_con_errores])
 
-            df['*Fecha de Nacimiento'] = pd.to_datetime(df['*Fecha de Nacimiento'], errors='ignore').dt.date
+            # --- AQUÍ ESTABA EL ERROR: ESTA ES LA LÍNEA CORREGIDA A PRUEBA DE BALAS ---
+            df['*Fecha de Nacimiento'] = df['*Fecha de Nacimiento'].apply(lambda x: x.date() if isinstance(x, (pd.Timestamp, datetime)) else x)
             
             buffer = io.BytesIO()
             
