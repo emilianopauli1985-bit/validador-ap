@@ -69,7 +69,12 @@ tab_armador, tab_validador = st.tabs(["🪄 Armar Excel (Limpiador)", "✅ Valid
 # PESTAÑA 1: ARMADOR / LIMPIADOR DE DATOS CRUDOS
 # ==========================================
 with tab_armador:
-    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Subí el Excel desordenado que te envió la empresa. El sistema extraerá los datos, los limpiará y generará la plantilla oficial lista para completar las sumas aseguradas.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Subí el Excel desordenado que te envió la empresa. Podés indicarle al sistema en qué fila empiezan los títulos para saltear logos o membretes.</div>', unsafe_allow_html=True)
+    
+    # NUEVO: Selector de fila de inicio
+    col_fila, col_espacio = st.columns([2, 3])
+    with col_fila:
+        fila_titulos = st.number_input("¿En qué fila del Excel están los títulos de las columnas? (Cambiá este número si hay títulos o logos arriba)", min_value=1, value=1)
     
     col1a, col2a = st.columns([2, 3])
     with col1a:
@@ -77,10 +82,15 @@ with tab_armador:
     
     if archivo_crudo is not None:
         try:
+            # NUEVO: Lee el archivo saltando las filas basura de arriba
+            filas_a_saltar = int(fila_titulos) - 1
             if archivo_crudo.name.endswith('.csv'):
-                df_crudo = pd.read_csv(archivo_crudo)
+                df_crudo = pd.read_csv(archivo_crudo, skiprows=filas_a_saltar)
             else:
-                df_crudo = pd.read_excel(archivo_crudo)
+                df_crudo = pd.read_excel(archivo_crudo, skiprows=filas_a_saltar)
+            
+            # NUEVO: Borramos las filas que estén 100% vacías para evitar errores de sistema
+            df_crudo = df_crudo.dropna(how='all')
                 
             columnas_disponibles = ["No incluir"] + list(df_crudo.columns)
             
@@ -90,7 +100,6 @@ with tab_armador:
             
             col_map1, col_map2, col_map3 = st.columns(3)
             with col_map1:
-                # ACÁ ESTÁ EL CAMBIO: options en lugar de opciones
                 col_dni = st.selectbox("Columna de DNI:", options=columnas_disponibles)
             with col_map2:
                 col_nombre = st.selectbox("Columna de Nombre y Apellido:", options=columnas_disponibles)
@@ -101,15 +110,17 @@ with tab_armador:
                 columnas_oficiales = ['MF', '*Tipo Id.', '*Nro. Id.', '*Fecha de Nacimiento', '*Apellido', '*Nombre', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
                 df_oficial = pd.DataFrame(columns=columnas_oficiales)
                 
+                # Procesar DNI (Ahora con conversión 100% segura a string)
                 if col_dni != "No incluir":
-                    df_oficial['*Nro. Id.'] = df_crudo[col_dni].astype(str).apply(lambda x: re.sub(r'[^0-9]', '', x) if x.lower() != 'nan' else '')
+                    df_oficial['*Nro. Id.'] = df_crudo[col_dni].apply(lambda x: re.sub(r'[^0-9]', '', str(x)) if str(x).lower() != 'nan' and pd.notna(x) else '')
                 
+                # Procesar Nombres y Apellidos
                 if col_nombre != "No incluir":
                     apellidos = []
                     nombres = []
                     for nombre_completo in df_crudo[col_nombre]:
                         texto = str(nombre_completo).strip()
-                        if texto.lower() == 'nan':
+                        if texto.lower() == 'nan' or pd.isna(nombre_completo):
                             apellidos.append("")
                             nombres.append("")
                         elif "," in texto:
@@ -127,10 +138,11 @@ with tab_armador:
                     df_oficial['*Apellido'] = apellidos
                     df_oficial['*Nombre'] = nombres
                 
+                # Procesar Fechas
                 if col_fecha != "No incluir":
                     fechas_limpias = []
                     for f in df_crudo[col_fecha]:
-                        if pd.isna(f):
+                        if pd.isna(f) or str(f).lower() == 'nan':
                             fechas_limpias.append("")
                         elif isinstance(f, (pd.Timestamp, datetime)):
                             fechas_limpias.append(f.date())
@@ -148,7 +160,7 @@ with tab_armador:
                 df_oficial['*Nacionalidad'] = 'ARGENTINA'
                 df_oficial['*Incapacidad'] = 'NO'
                 
-                st.success("✅ Plantilla generada exitosamente. Se limpiaron los DNI, se separaron los nombres y se asignó D.N.I. y Nacionalidad por defecto.")
+                st.success("✅ Plantilla generada exitosamente. Se limpiaron los datos y se aplicaron los valores por defecto.")
                 st.dataframe(df_oficial)
                 
                 buffer_armado = io.BytesIO()
@@ -163,7 +175,7 @@ with tab_armador:
                 )
             st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"Error al leer el archivo crudo: {e}")
+            st.error(f"Error al procesar el archivo: {e}. Verificá que la fila de inicio sea la correcta.")
 
 # ==========================================
 # PESTAÑA 2: VALIDADOR ESTRICTO (Código Original)
@@ -353,4 +365,4 @@ with tab_validador:
             )
 
         except Exception as e:
-            st
+            st.error(f"Error al leer el archivo. Detalle técnico: {e}")
