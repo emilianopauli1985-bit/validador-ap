@@ -33,34 +33,47 @@ st.markdown(
         text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
 
-    /* --- NUEVO: ESTILO PARA HACER LAS PESTAÑAS SÚPER VISIBLES --- */
+    /* --- NUEVO: ESTILO PREMIUM PARA PESTAÑAS (TIPO BOTONES REDONDEADOS) --- */
+    
+    /* Contenedor principal de las pestañas */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 10px; /* Separación entre botones */
+        gap: 15px;
+        background-color: rgba(0, 0, 0, 0.15); /* Fondo oscuro sutil para agrupar */
+        padding: 8px;
+        border-radius: 50px; /* Bordes redondeados modernos */
+        border: none;
+        margin-bottom: 10px;
     }
     
+    /* Pestañas inactivas */
     .stTabs [data-baseweb="tab"] {
-        background-color: rgba(255, 255, 255, 0.15) !important; /* Fondo semitransparente para la inactiva */
-        border-radius: 8px 8px 0px 0px !important;
-        padding: 10px 25px !important;
-        color: white !important; /* Texto blanco en la inactiva */
-        font-size: 18px !important;
+        background-color: transparent !important;
+        border-radius: 50px !important; /* Forma de píldora */
+        padding: 10px 24px !important;
+        color: white !important;
+        font-size: 16px !important;
         font-weight: bold !important;
-        border: 1px solid rgba(255, 255, 255, 0.4) !important;
-        border-bottom: none !important;
+        border: none !important;
+        transition: all 0.3s ease;
     }
     
+    /* Efecto al pasar el mouse por encima */
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+    }
+    
+    /* Pestaña ACTIVA */
     .stTabs [aria-selected="true"] {
-        background-color: rgba(255, 255, 255, 0.95) !important; /* Blanco sólido para la activa */
-        color: #b71c1c !important; /* Texto rojo oscuro para contraste */
+        background-color: white !important;
+        color: #b71c1c !important; /* Letra roja corporativa */
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important; /* Sombra elegante */
         text-shadow: none !important;
-        border: 1px solid white !important;
     }
     
-    .stTabs [data-baseweb="tab-highlight"] {
-        background-color: transparent !important; /* Oculta la rayita azul por defecto */
-    }
+    /* Ocultar las líneas por defecto feas de Streamlit */
+    .stTabs [data-baseweb="tab-highlight"], 
     .stTabs [data-baseweb="tab-border"] {
-        background-color: rgba(255, 255, 255, 0.5) !important;
+        display: none !important;
     }
     /* ------------------------------------------------------------- */
 
@@ -92,7 +105,7 @@ st.markdown(
 )
 
 st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Validador y Armador de Solicitudes AP</h1>', unsafe_allow_html=True)
-st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6);">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
+st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
 # Creamos las dos pestañas
 tab_armador, tab_validador = st.tabs(["🪄 Armar Excel (Limpiador)", "✅ Validar Carga"])
@@ -191,7 +204,6 @@ with tab_armador:
                 
                 buffer_armado = io.BytesIO()
                 
-                # Formato de exportación
                 with pd.ExcelWriter(buffer_armado, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
                     df_oficial.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
                 
@@ -369,7 +381,6 @@ with tab_validador:
             
             buffer = io.BytesIO()
             
-            # Formato de exportación
             with pd.ExcelWriter(buffer, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
                 df.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
                 workbook = writer.book
