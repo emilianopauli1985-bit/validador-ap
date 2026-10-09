@@ -147,27 +147,44 @@ st.markdown(
     }
     /* ============================================ */
 
+    /* ========================================================= */
+    /* DISEÑO DEL BOTÓN DE SUBIDA DE ARCHIVOS (UPLOADER)         */
+    /* ========================================================= */
+    
     [data-testid="stFileUploadDropzone"] button {
+        font-size: 0px !important; /* Colapsa la fuente original a 0 */
         color: transparent !important;
     }
+    
+    /* Oculta cualquier sub-elemento o ícono nativo de Streamlit que se cuele */
+    [data-testid="stFileUploadDropzone"] button * {
+        display: none !important;
+    }
+    
     [data-testid="stFileUploadDropzone"] button::after {
         content: "Subir archivo";
-        color: #262730;
+        color: #262730 !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
         position: absolute;
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        font-weight: 600;
+        visibility: visible !important;
+        display: block !important;
     }
     
     [data-testid="stFileUploadDropzone"] small {
+        font-size: 0px !important; /* Colapsa las instrucciones en inglés */
         color: transparent !important;
     }
+    
     [data-testid="stFileUploadDropzone"] small::after {
-        content: "Límite 200MB • Excel/CSV/PDF";
-        color: rgba(49, 51, 63, 0.6);
-        display: block;
-        margin-top: -15px;
+        content: "Límite 200MB • Excel / CSV / PDF";
+        color: rgba(49, 51, 63, 0.6) !important;
+        font-size: 13px !important;
+        display: block !important;
+        margin-top: 2px;
     }
     </style>
     """,
