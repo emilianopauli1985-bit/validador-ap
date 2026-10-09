@@ -147,45 +147,6 @@ st.markdown(
     }
     /* ============================================ */
 
-    /* ========================================================= */
-    /* DISEÑO DEL BOTÓN DE SUBIDA DE ARCHIVOS (UPLOADER)         */
-    /* ========================================================= */
-    
-    [data-testid="stFileUploadDropzone"] button {
-        font-size: 0px !important; /* Colapsa la fuente original a 0 */
-        color: transparent !important;
-    }
-    
-    /* Oculta cualquier sub-elemento o ícono nativo de Streamlit que se cuele */
-    [data-testid="stFileUploadDropzone"] button * {
-        display: none !important;
-    }
-    
-    [data-testid="stFileUploadDropzone"] button::after {
-        content: "Subir archivo";
-        color: #262730 !important;
-        font-size: 14px !important;
-        font-weight: 600 !important;
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        visibility: visible !important;
-        display: block !important;
-    }
-    
-    [data-testid="stFileUploadDropzone"] small {
-        font-size: 0px !important; /* Colapsa las instrucciones en inglés */
-        color: transparent !important;
-    }
-    
-    [data-testid="stFileUploadDropzone"] small::after {
-        content: "Límite 200MB • Excel / CSV / PDF";
-        color: rgba(49, 51, 63, 0.6) !important;
-        font-size: 13px !important;
-        display: block !important;
-        margin-top: 2px;
-    }
     </style>
     """,
     unsafe_allow_html=True
@@ -323,23 +284,30 @@ with tab_validador:
             total_fechas_mal_formato = 0
             total_fechas_corregidas = 0
             
-            # CÓDIGOS PARA RANGO DE EDAD INFANTIL/ESTUDIANTIL/DEPORTIVO (1 A 80 AÑOS)
             codigos_flexibles = ['9111', '9112', '9113', '9114', '9115', '9116', '9138', '9139', '9140', '9143', '9144']
             
             errores_col = {
-                'Err_TipoId': [''] * len(df), 'Err_NroId': [''] * len(df), 'Err_FechaNac': [''] * len(df),
+                'Err_TipoId': [''] * len(df), 'Err_NroId': [''] * len(df), 'Err_Apellido': [''] * len(df), 'Err_Nombre': [''] * len(df), 'Err_FechaNac': [''] * len(df),
                 'Err_SAMuerte': [''] * len(df), 'Err_SAInvalidez': [''] * len(df), 'Err_SAAMF': [''] * len(df),
                 'Err_Incapacidad': [''] * len(df), 'Err_Ocupacion': [''] * len(df), 'Err_Nacionalidad': [''] * len(df)
             }
 
             for index, row in df.iterrows():
+                # --- NUEVA VALIDACIÓN: Apellido y Nombre vacíos ---
+                apellido = str(row.get('*Apellido', '')).strip()
+                if pd.isna(row.get('*Apellido')) or apellido.lower() == 'nan' or not apellido:
+                    errores_col['Err_Apellido'][index] = "Apellido vacío"
+                    
+                nombre = str(row.get('*Nombre', '')).strip()
+                if pd.isna(row.get('*Nombre')) or nombre.lower() == 'nan' or not nombre:
+                    errores_col['Err_Nombre'][index] = "Nombre vacío"
+
                 # --- Validar Ocupación y definir reglas de edad ---
                 ocupacion_actual = str(row.get('*Ocupación', ''))
                 ocup = ocupacion_actual.strip().upper()
                 if pd.isna(row.get('*Ocupación')) or ocup == 'NAN' or not ocup:
                     errores_col['Err_Ocupacion'][index] = "Ocupación vacía"
                 
-                # Checkeamos si la ocupación tiene alguno de los códigos flexibles
                 es_ocupacion_flexible = any(codigo in ocupacion_actual for codigo in codigos_flexibles)
 
                 tipo_id = str(row.get('*Tipo Id.', '')).strip().upper()
@@ -387,7 +355,6 @@ with tab_validador:
                         else:
                             edad = hoy.year - fecha_nac.year - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
                             
-                            # --- NUEVA LÓGICA DE CONTROL DE EDAD ---
                             if edad > 80:
                                 errores_col['Err_FechaNac'][index] = "Mayor de 80 años"
                             elif es_ocupacion_flexible and edad < 1:
@@ -438,7 +405,7 @@ with tab_validador:
 
             tiene_error_fila = [False] * len(df)
             mapa_nombres = {
-                'Err_TipoId': 'Error: Tipo Id', 'Err_NroId': 'Error: Nro Id', 'Err_FechaNac': 'Error: Fecha Nac',
+                'Err_TipoId': 'Error: Tipo Id', 'Err_NroId': 'Error: Nro Id', 'Err_Apellido': 'Error: Apellido', 'Err_Nombre': 'Error: Nombre', 'Err_FechaNac': 'Error: Fecha Nac',
                 'Err_SAMuerte': 'Error: SA Muerte', 'Err_SAInvalidez': 'Error: SA Invalidez', 'Err_SAAMF': 'Error: SA AMF',
                 'Err_Incapacidad': 'Error: Incapacidad', 'Err_Ocupacion': 'Error: Ocupación', 'Err_Nacionalidad': 'Error: Nacionalidad'
             }
