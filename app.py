@@ -26,15 +26,12 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
     
     col_idx = 0
     for col_name, valores in LISTAS_DESPLEGABLES.items():
-        # Escribimos los datos en la hoja oculta
         worksheet_dv.write(0, col_idx, col_name)
         worksheet_dv.write_column(1, col_idx, valores)
         
-        # Buscamos si la columna existe en el Excel que estamos por descargar
         if col_name in df_export.columns:
             main_col_idx = list(df_export.columns).index(col_name)
             
-            # Cálculo de la letra de la columna para la fórmula de Excel
             if col_idx < 26:
                 letra_col_dv = string.ascii_uppercase[col_idx]
             else:
@@ -42,7 +39,6 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
                 
             rango_formula = f"=DataValidation!${letra_col_dv}$2:${letra_col_dv}${len(valores)+1}"
             
-            # Aplicamos la lista a todas las celdas de esa columna
             worksheet_main.data_validation(1, main_col_idx, 5000, main_col_idx, {
                 'validate': 'list',
                 'source': rango_formula
@@ -234,7 +230,6 @@ with tab_armador:
                                 fechas_limpias.append(f_str)
                     df_oficial['*Fecha de Nacimiento'] = fechas_limpias
 
-                # Autocompletado oficial
                 df_oficial['Acción'] = 'Agregar'
                 df_oficial['*Tipo Id.'] = 'D.N.I.'
                 df_oficial['*Nacionalidad'] = 'Argentina'
@@ -272,3 +267,265 @@ with tab_validador:
         try:
             df = pd.read_excel(archivo_agente, sheet_name="AP - Personas x Grupo")
             st.info("Procesando validaciones y corrigiendo formatos...")
+
+            hoy = pd.Timestamp.today()
+            total_fechas_mal_formato = 0
+            total_fechas_corregidas = 0
+            
+            errores_col = {
+                'Err_TipoId': [''] * len(df), 'Err_NroId': [''] * len(df), 'Err_FechaNac': [''] * len(df),
+                'Err_SAMuerte': [''] * len(df), 'Err_SAInvalidez': [''] * len(df), 'Err_SAAMF': [''] * len(df),
+                'Err_Incapacidad': [''] * len(df), 'Err_Ocupacion': [''] * len(df), 'Err_Nacionalidad': [''] * len(df)
+            }
+
+            for index, row in df.iterrows():
+                tipo_id = str(row.get('*Tipo Id.', '')).strip().upper()
+                if pd.isna(row.get('*Tipo Id.')) or tipo_id == 'NAN' or not tipo_id:
+                    errores_col['Err_TipoId'][index] = "Falta seleccionar D.N.I. o Pasaporte"
+                
+                nro_id = row.get('*Nro. Id.')
+                nro_id_str = str(nro_id).strip()
+                
+                if pd.isna(nro_id) or nro_id_str == 'nan' or not nro_id_str:
+                    errores_col['Err_NroId'][index] = "DNI vacío"
+                else:
+                    if not nro_id_str.replace('.', '').isdigit() or '.' in nro_id_str or ',' in nro_id_str:
+                        errores_col['Err_NroId'][index] = "DNI con letras/puntos"
+                    elif tipo_id == 'PASAPORTE':
+                        if not nro_id_str.isdigit() or nro_id_str.startswith('0'):
+                            errores_col['Err_NroId'][index] = "Pasaporte inicia con 0 o tiene letras"
+                
+                fecha_nac = row.get('*Fecha de Nacimiento')
+                if pd.notna(fecha_nac):
+                    es_valida = True
+                    if not isinstance(fecha_nac, pd.Timestamp) and not isinstance(fecha_nac, datetime):
+                        total_fechas_mal_formato += 1
+                        fecha_str = str(fecha_nac)
+                        numeros = re.sub(r'[^0-9]', '', fecha_str)
+                        corregida = False
+                        
+                        if len(numeros) == 8:
+                            try:
+                                fecha_limpia = pd.to_datetime(numeros, format='%d%m%Y')
+                                df.at[index, '*Fecha de Nacimiento'] = fecha_limpia
+                                fecha_nac = fecha_limpia
+                                corregida = True
+                                total_fechas_corregidas += 1
+                            except:
+                                pass
+                        
+                        if not corregida:
+                            errores_col['Err_FechaNac'][index] = "Fecha en formato texto irreconocible"
+                            es_valida = False
+
+                    if es_valida and (isinstance(fecha_nac, pd.Timestamp) or isinstance(fecha_nac, datetime)):
+                        if fecha_nac > hoy:
+                            errores_col['Err_FechaNac'][index] = "Fecha futura"
+                        else:
+                            edad = hoy.year - fecha_nac.year - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
+                            if edad < 15:
+                                errores_col['Err_FechaNac'][index] = "Menor de 15 años"
+                                
+                if pd.isna(row.get('*S.A. Individual Muerte')): errores_col['Err_SAMuerte'][index] = "S.A. Muerte vacía"
+                else:
+                    try: float(row.get('*S.A. Individual Muerte'))
+                    except: errores_col['Err_SAMuerte'][index] = "S.A. Muerte no es número"
+
+                if pd.isna(row.get('S.A. Individual Inválidez')): errores_col['Err_SAInvalidez'][index] = "S.A. Invalidez vacía"
+                else:
+                    try: float(row.get('S.A. Individual Inválidez'))
+                    except: errores_col['Err_SAInvalidez'][index] = "S.A. Invalidez no es número"
+
+                if pd.isna(row.get('S.A. AMF')): errores_col['Err_SAAMF'][index] = "S.A. AMF vacía"
+                else:
+                    try: float(row.get('S.A. AMF'))
+                    except: errores_col['Err_SAAMF'][index] = "S.A. AMF no es número"
+                        
+                incap = str(row.get('*Incapacidad')).strip().upper()
+                if incap not in ['SI', 'NO']:
+                    errores_col['Err_Incapacidad'][index] = "Incapacidad debe ser SI o NO"
+                    
+                ocup = str(row.get('*Ocupación')).strip().upper()
+                if pd.isna(row.get('*Ocupación')) or ocup == 'NAN' or not ocup:
+                    errores_col['Err_Ocupacion'][index] = "Ocupación vacía"
+                    
+                nac = str(row.get('*Nacionalidad')).strip().upper()
+                if pd.isna(row.get('*Nacionalidad')) or nac == 'NAN' or not nac:
+                    errores_col['Err_Nacionalidad'][index] = "Nacionalidad vacía"
+
+            nro_ids = df['*Nro. Id.'].dropna().astype(str).tolist()
+            dups = set([x for x in nro_ids if nro_ids.count(x) > 1])
+
+            for index, row in df.iterrows():
+                nro_id = str(row.get('*Nro. Id.'))
+                if nro_id in dups:
+                    actual = errores_col['Err_NroId'][index]
+                    errores_col['Err_NroId'][index] = "DNI duplicado" if not actual else actual + " / DNI duplicado"
+
+            lista_todos_errores = []
+            for categoria, lista_err in errores_col.items():
+                for error in lista_err:
+                    if error != '':
+                        for sub_error in error.split(" / "):
+                            lista_todos_errores.append(sub_error)
+            
+            conteo_errores = Counter(lista_todos_errores)
+
+            tiene_error_fila = [False] * len(df)
+            mapa_nombres = {
+                'Err_TipoId': 'Error: Tipo Id', 'Err_NroId': 'Error: Nro Id', 'Err_FechaNac': 'Error: Fecha Nac',
+                'Err_SAMuerte': 'Error: SA Muerte', 'Err_SAInvalidez': 'Error: SA Invalidez', 'Err_SAAMF': 'Error: SA AMF',
+                'Err_Incapacidad': 'Error: Incapacidad', 'Err_Ocupacion': 'Error: Ocupación', 'Err_Nacionalidad': 'Error: Nacionalidad'
+            }
+
+            columnas_con_errores = []
+            for clave, nombre_col in mapa_nombres.items():
+                if any(errores_col[clave]): 
+                    df[nombre_col] = errores_col[clave]
+                    columnas_con_errores.append(nombre_col)
+                    for i, val in enumerate(errores_col[clave]):
+                        if val != '': tiene_error_fila[i] = True
+
+            df.insert(0, 'Estado Fila', ["❌ ERROR" if e else "✅ OK" for e in tiene_error_fila])
+            errores_totales = sum(tiene_error_fila)
+            
+            if total_fechas_mal_formato > 0:
+                st.success(f"🪄 **Autocorrección Inteligente:** Se detectaron {total_fechas_mal_formato} fechas mal escritas. El sistema logró corregir automáticamente {total_fechas_corregidas} de ellas.")
+            
+            if errores_totales == 0:
+                st.success("✅ ¡Excelente! El archivo ya no tiene errores y está listo para enviar.")
+            else:
+                st.error(f"❌ Se encontraron {errores_totales} filas con errores que requieren intervención manual.")
+                
+                html_resumen = f"""
+                <div style="background-color: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 10px; color: #333; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="color: #d32f2f; margin-top: 0;">📊 Detalle de Errores Restantes:</h3>
+                    <ul style="font-size: 16px;">
+                """
+                for error_texto, cantidad in conteo_errores.most_common():
+                    html_resumen += f"<li><b>{cantidad}</b> x {error_texto}</li>"
+                    
+                html_resumen += """
+                    </ul>
+                    <hr style="border-top: 1px solid #ccc;">
+                    <p style="margin-bottom: 0;"><b>Vista previa</b> (descargá el Excel para ver todos los detalles y usar los filtros):</p>
+                </div>
+                """
+                st.markdown(html_resumen, unsafe_allow_html=True)
+                
+                st.dataframe(df[df['Estado Fila'] == "❌ ERROR"][['Estado Fila', '*Nro. Id.', '*Apellido'] + columnas_con_errores])
+
+            df['*Fecha de Nacimiento'] = df['*Fecha de Nacimiento'].apply(lambda x: x.date() if isinstance(x, (pd.Timestamp, datetime)) else x)
+            
+            buffer = io.BytesIO()
+            
+            with pd.ExcelWriter(buffer, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
+                df.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
+                workbook = writer.book
+                worksheet = writer.sheets['AP - Personas x Grupo']
+                
+                inyectar_listas_desplegables(writer, df, workbook, "AP - Personas x Grupo")
+                
+                formato_rojo = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
+                formato_verde = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100'})
+                formato_amarillo = workbook.add_format({'bg_color': '#FFF2CC', 'font_color': '#9C6500'})
+                
+                worksheet.conditional_format('A2:A5000', {'type': 'text', 'criteria': 'containing', 'value': 'ERROR', 'format': formato_rojo})
+                worksheet.conditional_format('A2:A5000', {'type': 'text', 'criteria': 'containing', 'value': 'OK', 'format': formato_verde})
+                worksheet.set_column(0, 0, 15) 
+                
+                if columnas_con_errores:
+                    idx_inicio = len(df.columns) - len(columnas_con_errores)
+                    worksheet.set_column(idx_inicio, len(df.columns)-1, 25, formato_amarillo)
+
+            st.download_button(
+                label="📥 Descargar Excel con Reporte de Errores" if errores_totales > 0 else "📥 Descargar Excel Validado",
+                data=buffer.getvalue(),
+                file_name="Control_AP_Reporte.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        except Exception as e:
+            st.error(f"Error al leer el archivo. Detalle técnico: {e}")
+
+# ==========================================
+# PESTAÑA 3: CONVERTIDOR DE PDF
+# ==========================================
+with tab_pdf:
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Subí la nómina en PDF. Si el sistema detecta una tabla estructurada, generará un <b>Excel</b>. Si solo detecta texto suelto, generará un archivo de <b>Word</b> para que te sea más fácil copiar y pegar los datos.</div>', unsafe_allow_html=True)
+    
+    col1c, col2c = st.columns([2, 3])
+    with col1c:
+        archivo_pdf = st.file_uploader("Subí el PDF del cliente", type=["pdf"], key="uploader_pdf")
+    
+    if archivo_pdf is not None:
+        if st.button("🔍 Extraer Datos"):
+            try:
+                import pdfplumber
+                import docx
+            except ImportError:
+                st.error("❌ Faltan instalar librerías. Por favor, agregá las palabras 'pdfplumber' y 'python-docx' a tu archivo requirements.txt en GitHub (una debajo de la otra) y esperá a que la aplicación se reinicie.")
+            else:
+                with st.spinner("Escaneando PDF... esto puede demorar unos segundos."):
+                    todas_las_filas = []
+                    texto_crudo = []
+                    
+                    try:
+                        with pdfplumber.open(archivo_pdf) as pdf:
+                            for page in pdf.pages:
+                                tablas = page.extract_tables()
+                                if tablas:
+                                    for tabla in tablas:
+                                        tabla_limpia = [[str(celda).strip() if celda is not None else "" for celda in fila] for fila in tabla]
+                                        todas_las_filas.extend(tabla_limpia)
+                                
+                                texto = page.extract_text()
+                                if texto:
+                                    texto_crudo.extend(texto.split('\n'))
+                        
+                        st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px;">', unsafe_allow_html=True)
+                        
+                        if todas_las_filas:
+                            st.success("✅ ¡Se detectaron tablas estructuradas! Generando archivo Excel...")
+                            df_pdf = pd.DataFrame(todas_las_filas)
+                            st.write("**Vista Previa:**")
+                            st.dataframe(df_pdf.head(15))
+                            
+                            buffer_pdf = io.BytesIO()
+                            with pd.ExcelWriter(buffer_pdf, engine='xlsxwriter') as writer:
+                                df_pdf.to_excel(writer, index=False, header=False, sheet_name="Datos Extraídos")
+                                workbook = writer.book
+                                inyectar_listas_desplegables(writer, df_pdf, workbook, "Datos Extraídos")
+                            
+                            st.download_button(
+                                label="📥 Descargar Tabla en Excel",
+                                data=buffer_pdf.getvalue(),
+                                file_name="PDF_Convertido.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+                            
+                        elif texto_crudo:
+                            st.warning("⚠️ El PDF no tenía formato de tabla. Se generó un archivo Word con el texto limpio para que puedas copiar y pegar.")
+                            
+                            doc = docx.Document()
+                            doc.add_heading('Texto extraído del PDF', 0)
+                            for linea in texto_crudo:
+                                if linea.strip(): 
+                                    doc.add_paragraph(linea.strip())
+                                    
+                            buffer_word = io.BytesIO()
+                            doc.save(buffer_word)
+                            
+                            st.download_button(
+                                label="📝 Descargar Texto en Word (.docx)",
+                                data=buffer_word.getvalue(),
+                                file_name="PDF_Texto_Extraido.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            )
+                        else:
+                            st.error("No se detectaron textos ni tablas. Es probable que el PDF sea una foto o imagen escaneada.")
+                            
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                    except Exception as e:
+                        st.error(f"Ocurrió un error inesperado al leer el PDF: {e}")
