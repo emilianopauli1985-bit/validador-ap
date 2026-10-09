@@ -140,7 +140,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente de Solicitudes de Accidentes Personales</h1>', unsafe_allow_html=True)
+# === ACÁ ESTÁ EL CAMBIO DE TÍTULO ===
+st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente Operativo - Accidentes Personales</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
 tab_armador, tab_validador, tab_pdf = st.tabs(["🪄 Armar Excel (Limpiador)", "✅ Validar Carga", "📄 PDF a Excel / Word"])
