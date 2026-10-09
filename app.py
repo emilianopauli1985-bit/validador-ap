@@ -49,12 +49,37 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
     worksheet_dv.hide()
 
 # Configuración de la página
-st.set_page_config(page_title="Validador de Cargas AP", layout="wide")
+st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
 
-# Fondo de pantalla y estilos
+# Fondo de pantalla y estilos tipográficos
 st.markdown(
     """
     <style>
+    /* IMPORTAR SORA EN SUS GROSORES: 300 (FINA), 400 (REGULAR) Y 600 (SEMI BOLD) */
+    @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600&display=swap');
+
+    /* APLICAR SORA Y LINE-HEIGHT GLOBAL */
+    html, body, [class*="st-"], p, h1, h2, h3, h4, h5, h6, span, label, button, li, div, small {
+        font-family: 'Sora', sans-serif !important;
+    }
+    
+    /* Texto normal Fino (300) e interlineado */
+    p, li, span, div {
+        font-weight: 300 !important;
+        line-height: 1.6 !important;
+    }
+
+    /* Etiquetas de botones y subtextos en peso normal (400) */
+    small {
+        font-weight: 400 !important;
+    }
+
+    /* Títulos, subtítulos y negritas en Semi Negrita (600) */
+    h1, h2, h3, h4, h5, h6, strong, b {
+        font-weight: 600 !important;
+    }
+
+    /* Fondo general */
     .stApp {
         background-image: url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/L2_Wallpaper-05.jpg");
         background-size: cover;
@@ -62,26 +87,29 @@ st.markdown(
         background-attachment: fixed;
     }
     
+    /* Paneles y tablas */
     .stAlert, [data-testid="stDataFrame"] {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 10px;
         padding: 10px;
     }
 
+    /* Textos descriptivos de herramientas (Etiquetas de inputs) */
     label[data-testid="stWidgetLabel"] p {
         color: white !important;
         font-size: 16px !important;
-        font-weight: bold !important;
+        font-weight: 600 !important;
         text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
 
-    /* Pestañas (Botones) */
+    /* ================= PESTAÑAS ================= */
     .stTabs [data-baseweb="tab-list"] {
         gap: 15px !important;
         background-color: transparent !important;
         flex-wrap: wrap !important;
     }
 
+    /* Pestaña Inactiva */
     button[data-baseweb="tab"] {
         background-color: rgba(0, 0, 0, 0.6) !important; 
         border-radius: 8px !important;
@@ -90,28 +118,34 @@ st.markdown(
         margin: 0 !important;
     }
     
+    /* TEXTO BLANCO EN TODAS LAS PESTAÑAS SIMULANDO AL TÍTULO */
     button[data-baseweb="tab"] div[data-testid="stMarkdownContainer"] p {
-        color: #FFFFFF !important;
+        color: white !important;
         font-size: 18px !important;
-        font-weight: 800 !important; 
+        font-weight: 600 !important; 
+        text-shadow: 1px 1px 4px rgba(0,0,0,0.6) !important;
     }
 
+    /* Pestaña Activa */
     button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #FFFFFF !important;
-        border: 2px solid #FFFFFF !important;
+        background-color: #900000 !important; /* Rojo oscuro elegante para resaltar el texto blanco */
+        border: 2px solid white !important;
         box-shadow: 0px 4px 10px rgba(0,0,0,0.4) !important;
     }
     
     button[data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
-        color: #900000 !important; 
-        font-weight: 900 !important; 
+        color: white !important; 
+        font-weight: 600 !important; 
+        text-shadow: 2px 2px 5px rgba(0,0,0,0.8) !important;
     }
 
+    /* Ocultar barra inferior fea nativa */
     div[data-baseweb="tab-highlight"], 
     div[data-baseweb="tab-border"] {
         display: none !important;
         background-color: transparent !important;
     }
+    /* ============================================ */
 
     [data-testid="stFileUploadDropzone"] button {
         color: transparent !important;
@@ -123,7 +157,7 @@ st.markdown(
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        font-weight: 500;
+        font-weight: 600;
     }
     
     [data-testid="stFileUploadDropzone"] small {
@@ -140,7 +174,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# === ACÁ ESTÁ EL CAMBIO DE TÍTULO ===
 st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente Operativo - Accidentes Personales</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
