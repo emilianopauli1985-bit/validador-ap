@@ -6,6 +6,19 @@ from collections import Counter
 import re
 import string
 
+# Configuración inicial de la página
+st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
+
+# =========================================================
+# VARIABLES DE MEMORIA (Para limpiar los archivos subidos)
+# =========================================================
+if 'reset_armador' not in st.session_state:
+    st.session_state.reset_armador = 0
+if 'reset_validador' not in st.session_state:
+    st.session_state.reset_validador = 0
+if 'reset_pdf' not in st.session_state:
+    st.session_state.reset_pdf = 0
+
 # =========================================================
 # LISTAS DESPLEGABLES EXTRAÍDAS DE LA PLANTILLA OFICIAL
 # =========================================================
@@ -48,10 +61,7 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
         
     worksheet_dv.hide()
 
-# Configuración de la página
-st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
-
-# Fondo de pantalla y estilos de pestañas (sin afectar al uploader ni tipografía global)
+# Fondo de pantalla y estilos de pestañas (sin afectar al uploader)
 st.markdown(
     """
     <style>
@@ -144,7 +154,8 @@ with tab_armador:
     
     col1a, col2a = st.columns([2, 3])
     with col1a:
-        archivo_crudo = st.file_uploader("Subí el Excel crudo del cliente", type=["xlsx", "xls", "csv"], key="uploader_armador")
+        # Clave dinámica para permitir el reseteo
+        archivo_crudo = st.file_uploader("Subí el Excel crudo del cliente", type=["xlsx", "xls", "csv"], key=f"uploader_armador_{st.session_state.reset_armador}")
     
     if archivo_crudo is not None:
         try:
@@ -232,12 +243,21 @@ with tab_armador:
                     workbook = writer.book
                     inyectar_listas_desplegables(writer, df_oficial, workbook, "AP - Personas x Grupo")
                 
-                st.download_button(
-                    label="📥 Descargar Plantilla Oficial Pre-armada",
-                    data=buffer_armado.getvalue(),
-                    file_name="AP_Personas_Prearmado.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                # Agregamos botones en columnas
+                col_d1, col_d2 = st.columns([1, 1])
+                with col_d1:
+                    st.download_button(
+                        label="📥 Descargar Plantilla Oficial Pre-armada",
+                        data=buffer_armado.getvalue(),
+                        file_name="AP_Personas_Prearmado.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+                with col_d2:
+                    if st.button("🧹 Empezar de cero / Nueva Carga", key="btn_armador", use_container_width=True):
+                        st.session_state.reset_armador += 1
+                        st.rerun()
+
             st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}. Verificá que la fila de inicio sea la correcta.")
@@ -248,7 +268,8 @@ with tab_armador:
 with tab_validador:
     col1b, col2b = st.columns([2, 3])
     with col1b:
-        archivo_agente = st.file_uploader("Seleccioná el archivo Excel listo (.xlsx)", type=["xlsx"], key="uploader_validador")
+        # Clave dinámica para permitir el reseteo
+        archivo_agente = st.file_uploader("Seleccioná el archivo Excel listo (.xlsx)", type=["xlsx"], key=f"uploader_validador_{st.session_state.reset_validador}")
 
     if archivo_agente is not None:
         try:
@@ -259,7 +280,6 @@ with tab_validador:
             total_fechas_mal_formato = 0
             total_fechas_corregidas = 0
             
-            # CÓDIGOS PARA RANGO DE EDAD INFANTIL/ESTUDIANTIL/DEPORTIVO (1 A 80 AÑOS)
             codigos_flexibles = ['9111', '9112', '9113', '9114', '9115', '9116', '9138', '9139', '9140', '9143', '9144']
             
             errores_col = {
@@ -269,7 +289,6 @@ with tab_validador:
             }
 
             for index, row in df.iterrows():
-                # --- NUEVA VALIDACIÓN: Apellido y Nombre vacíos ---
                 apellido = str(row.get('*Apellido', '')).strip()
                 if pd.isna(row.get('*Apellido')) or apellido.lower() == 'nan' or not apellido:
                     errores_col['Err_Apellido'][index] = "Apellido vacío"
@@ -278,7 +297,6 @@ with tab_validador:
                 if pd.isna(row.get('*Nombre')) or nombre.lower() == 'nan' or not nombre:
                     errores_col['Err_Nombre'][index] = "Nombre vacío"
 
-                # --- Validar Ocupación y definir reglas de edad ---
                 ocupacion_actual = str(row.get('*Ocupación', ''))
                 ocup = ocupacion_actual.strip().upper()
                 if pd.isna(row.get('*Ocupación')) or ocup == 'NAN' or not ocup:
@@ -446,12 +464,20 @@ with tab_validador:
                     idx_inicio = len(df.columns) - len(columnas_con_errores)
                     worksheet.set_column(idx_inicio, len(df.columns)-1, 25, formato_amarillo)
 
-            st.download_button(
-                label="📥 Descargar Excel con Reporte de Errores" if errores_totales > 0 else "📥 Descargar Excel Validado",
-                data=buffer.getvalue(),
-                file_name="Control_AP_Reporte.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            # Agregamos botones en columnas
+            col_d1, col_d2 = st.columns([1, 1])
+            with col_d1:
+                st.download_button(
+                    label="📥 Descargar Excel con Reporte de Errores" if errores_totales > 0 else "📥 Descargar Excel Validado",
+                    data=buffer.getvalue(),
+                    file_name="Control_AP_Reporte.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            with col_d2:
+                if st.button("🧹 Empezar de cero / Nueva Carga", key="btn_validador", use_container_width=True):
+                    st.session_state.reset_validador += 1
+                    st.rerun()
 
         except Exception as e:
             st.error(f"Error al leer el archivo. Detalle técnico: {e}")
@@ -464,7 +490,8 @@ with tab_pdf:
     
     col1c, col2c = st.columns([2, 3])
     with col1c:
-        archivo_pdf = st.file_uploader("Subí el PDF del cliente", type=["pdf"], key="uploader_pdf")
+        # Clave dinámica para permitir el reseteo
+        archivo_pdf = st.file_uploader("Subí el PDF del cliente", type=["pdf"], key=f"uploader_pdf_{st.session_state.reset_pdf}")
     
     if archivo_pdf is not None:
         if st.button("🔍 Extraer Datos"):
@@ -505,12 +532,19 @@ with tab_pdf:
                                 workbook = writer.book
                                 inyectar_listas_desplegables(writer, df_pdf, workbook, "Datos Extraídos")
                             
-                            st.download_button(
-                                label="📥 Descargar Tabla en Excel",
-                                data=buffer_pdf.getvalue(),
-                                file_name="PDF_Convertido.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
+                            col_d1, col_d2 = st.columns([1, 1])
+                            with col_d1:
+                                st.download_button(
+                                    label="📥 Descargar Tabla en Excel",
+                                    data=buffer_pdf.getvalue(),
+                                    file_name="PDF_Convertido.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True
+                                )
+                            with col_d2:
+                                if st.button("🧹 Empezar de cero", key="btn_pdf_excel", use_container_width=True):
+                                    st.session_state.reset_pdf += 1
+                                    st.rerun()
                             
                         elif texto_crudo:
                             st.warning("⚠️ El PDF no tenía formato de tabla. Se generó un archivo Word con el texto limpio para que puedas copiar y pegar.")
@@ -524,12 +558,19 @@ with tab_pdf:
                             buffer_word = io.BytesIO()
                             doc.save(buffer_word)
                             
-                            st.download_button(
-                                label="📝 Descargar Texto en Word (.docx)",
-                                data=buffer_word.getvalue(),
-                                file_name="PDF_Texto_Extraido.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
+                            col_d1, col_d2 = st.columns([1, 1])
+                            with col_d1:
+                                st.download_button(
+                                    label="📝 Descargar Texto en Word (.docx)",
+                                    data=buffer_word.getvalue(),
+                                    file_name="PDF_Texto_Extraido.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    use_container_width=True
+                                )
+                            with col_d2:
+                                if st.button("🧹 Empezar de cero", key="btn_pdf_word", use_container_width=True):
+                                    st.session_state.reset_pdf += 1
+                                    st.rerun()
                         else:
                             st.error("No se detectaron textos ni tablas. Es probable que el PDF sea una foto o imagen escaneada.")
                             
