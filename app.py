@@ -51,34 +51,10 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
 # Configuración de la página
 st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
 
-# Fondo de pantalla y estilos tipográficos
+# Fondo de pantalla y estilos de pestañas (sin afectar al uploader ni tipografía global)
 st.markdown(
     """
     <style>
-    /* IMPORTAR SORA EN SUS GROSORES: 300 (FINA), 400 (REGULAR) Y 600 (SEMI BOLD) */
-    @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600&display=swap');
-
-    /* APLICAR SORA Y LINE-HEIGHT GLOBAL */
-    html, body, [class*="st-"], p, h1, h2, h3, h4, h5, h6, span, label, button, li, div, small {
-        font-family: 'Sora', sans-serif !important;
-    }
-    
-    /* Texto normal Fino (300) e interlineado */
-    p, li, span, div {
-        font-weight: 300 !important;
-        line-height: 1.6 !important;
-    }
-
-    /* Etiquetas de botones y subtextos en peso normal (400) */
-    small {
-        font-weight: 400 !important;
-    }
-
-    /* Títulos, subtítulos y negritas en Semi Negrita (600) */
-    h1, h2, h3, h4, h5, h6, strong, b {
-        font-weight: 600 !important;
-    }
-
     /* Fondo general */
     .stApp {
         background-image: url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/L2_Wallpaper-05.jpg");
@@ -128,7 +104,7 @@ st.markdown(
 
     /* Pestaña Activa */
     button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #900000 !important; /* Rojo oscuro elegante para resaltar el texto blanco */
+        background-color: #900000 !important; 
         border: 2px solid white !important;
         box-shadow: 0px 4px 10px rgba(0,0,0,0.4) !important;
     }
@@ -146,7 +122,6 @@ st.markdown(
         background-color: transparent !important;
     }
     /* ============================================ */
-
     </style>
     """,
     unsafe_allow_html=True
@@ -284,6 +259,7 @@ with tab_validador:
             total_fechas_mal_formato = 0
             total_fechas_corregidas = 0
             
+            # CÓDIGOS PARA RANGO DE EDAD INFANTIL/ESTUDIANTIL/DEPORTIVO (1 A 80 AÑOS)
             codigos_flexibles = ['9111', '9112', '9113', '9114', '9115', '9116', '9138', '9139', '9140', '9143', '9144']
             
             errores_col = {
