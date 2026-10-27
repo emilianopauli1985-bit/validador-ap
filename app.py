@@ -17,6 +17,8 @@ if 'reset_armador' not in st.session_state:
     st.session_state.reset_armador = 0
 if 'reset_validador' not in st.session_state:
     st.session_state.reset_validador = 0
+if 'reset_unificador' not in st.session_state:
+    st.session_state.reset_unificador = 0
 if 'reset_pdf' not in st.session_state:
     st.session_state.reset_pdf = 0
 
@@ -151,7 +153,10 @@ st.markdown(
 st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente Operativo - Accidentes Personales</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
-tab_armador, tab_validador, tab_pdf, tab_cotizaciones = st.tabs(["🪄 Armar Excel", "✅ Validar Carga", "📄 PDF a Excel / Word", "📚 Cotizaciones Frecuentes"])
+# NUEVO ORDEN DE PESTAÑAS: Unificador en la posición 3
+tab_armador, tab_validador, tab_unificador, tab_pdf, tab_cotizaciones = st.tabs([
+    "🪄 Armar Excel", "✅ Validar Carga", "🔗 Unificar Excels", "📄 PDF a Excel / Word", "📚 Cotizaciones Frecuentes"
+])
 
 # ==========================================
 # PESTAÑA 1: ARMADOR / LIMPIADOR DE DATOS CRUDOS
@@ -533,7 +538,207 @@ with tab_validador:
             st.error(f"Error al leer el archivo. Detalle técnico: {e}")
 
 # ==========================================
-# PESTAÑA 3: CONVERTIDOR DE PDF
+# PESTAÑA 3: UNIFICADOR DE EXCELS
+# ==========================================
+with tab_unificador:
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Subí varios archivos Excel a la vez (de distintas sucursales). Configurá cada uno por separado y unificálos en una sola Plantilla Oficial.</div>', unsafe_allow_html=True)
+    
+    archivos_multiples = st.file_uploader("Subí todos los archivos que quieras fusionar", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key=f"uploader_unif_{st.session_state.reset_unificador}")
+    
+    if archivos_multiples:
+        configs = []
+        st.write("### ⚙️ Configuración de Archivos")
+        
+        # Generar un menú de configuración (acordeón) para CADA archivo subido
+        for idx, archivo in enumerate(archivos_multiples):
+            with st.expander(f"📁 Configurar archivo {idx+1}: {archivo.name}", expanded=True):
+                archivo.seek(0)
+                col_f_1, col_f_2 = st.columns([2, 3])
+                with col_f_1:
+                    fila_titulos = st.number_input(f"Fila de títulos en este archivo:", min_value=1, value=1, key=f"fila_unif_{idx}")
+                
+                try:
+                    filas_a_saltar = int(fila_titulos) - 1
+                    if archivo.name.endswith('.csv'):
+                        df_tmp = pd.read_csv(archivo, skiprows=filas_a_saltar, nrows=5)
+                    else:
+                        df_tmp = pd.read_excel(archivo, skiprows=filas_a_saltar, nrows=5)
+                    
+                    columnas_disponibles = ["No incluir"] + list(df_tmp.columns)
+                    
+                    formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido acá?", ["En una sola columna", "En columnas separadas"], horizontal=True, key=f"fmt_nom_unif_{idx}")
+                    
+                    if formato_nombres == "En una sola columna":
+                        c1, c2, c3, c4 = st.columns(4)
+                        with c1: col_dni = st.selectbox("DNI:", options=columnas_disponibles, key=f"dni1_{idx}")
+                        with c2: col_nombre_completo = st.selectbox("Nombre completo:", options=columnas_disponibles, key=f"nomc_{idx}")
+                        with c3: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec1_{idx}")
+                        with c4: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id1_{idx}")
+                        col_apellido_sep = "No incluir"
+                        col_nombre_sep = "No incluir"
+                    else:
+                        c1, c2, c3, c4, c5 = st.columns(5)
+                        with c1: col_dni = st.selectbox("DNI:", options=columnas_disponibles, key=f"dni2_{idx}")
+                        with c2: col_apellido_sep = st.selectbox("Apellido:", options=columnas_disponibles, key=f"ape_{idx}")
+                        with c3: col_nombre_sep = st.selectbox("Nombre:", options=columnas_disponibles, key=f"nom_{idx}")
+                        with c4: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec2_{idx}")
+                        with c5: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id2_{idx}")
+                        col_nombre_completo = "No incluir"
+                        
+                    configs.append({
+                        'archivo': archivo,
+                        'fila_titulos': fila_titulos,
+                        'formato_nombres': formato_nombres,
+                        'col_dni': col_dni,
+                        'col_nombre_completo': col_nombre_completo,
+                        'col_apellido_sep': col_apellido_sep,
+                        'col_nombre_sep': col_nombre_sep,
+                        'col_fecha': col_fecha,
+                        'col_id_persona': col_id_persona
+                    })
+                except Exception as e:
+                    st.error(f"Error leyendo {archivo.name}. Verificá la fila de títulos. Detalle: {e}")
+
+        # Si todos los archivos fueron configurados correctamente, habilitar botón de fusión
+        if len(configs) == len(archivos_multiples):
+            st.markdown("---")
+            if st.button("🔗 Consolidar Archivos y Generar Plantilla Oficial", use_container_width=True):
+                lista_dfs_limpios = []
+                tiene_id = any(cfg['col_id_persona'] != "No incluir" for cfg in configs)
+                
+                for cfg in configs:
+                    cfg['archivo'].seek(0)
+                    filas_a_saltar = int(cfg['fila_titulos']) - 1
+                    if cfg['archivo'].name.endswith('.csv'):
+                        df_crudo = pd.read_csv(cfg['archivo'], skiprows=filas_a_saltar)
+                    else:
+                        df_crudo = pd.read_excel(cfg['archivo'], skiprows=filas_a_saltar)
+                    
+                    df_crudo = df_crudo.dropna(how='all')
+                    
+                    # Preparar columnas base para este archivo
+                    columnas_oficiales = ['Acción', '*Tipo Id.', '*Nro. Id.', '*Apellido', '*Nombre', '*Fecha de Nacimiento', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
+                    if tiene_id:
+                        columnas_oficiales.insert(1, 'ID de Persona')
+                        
+                    df_oficial = pd.DataFrame(columns=columnas_oficiales)
+                    
+                    # Extraer datos mapeados
+                    if tiene_id:
+                        if cfg['col_id_persona'] != "No incluir":
+                            df_oficial['ID de Persona'] = df_crudo[cfg['col_id_persona']].fillna("")
+                        else:
+                            df_oficial['ID de Persona'] = ""
+                            
+                    if cfg['col_dni'] != "No incluir":
+                        df_oficial['*Nro. Id.'] = df_crudo[cfg['col_dni']].apply(lambda x: re.sub(r'[^0-9]', '', str(x)) if str(x).lower() != 'nan' and pd.notna(x) else '')
+                    
+                    apellidos = []
+                    nombres = []
+                    if cfg['formato_nombres'] == "En una sola columna":
+                        if cfg['col_nombre_completo'] != "No incluir":
+                            for nombre_completo in df_crudo[cfg['col_nombre_completo']]:
+                                texto = str(nombre_completo).strip()
+                                if texto.lower() == 'nan' or pd.isna(nombre_completo) or not texto:
+                                    apellidos.append("")
+                                    nombres.append("")
+                                elif "," in texto:
+                                    partes = texto.split(",", 1)
+                                    apellidos.append(partes[0].strip().upper())
+                                    nombres.append(partes[1].strip().upper())
+                                else:
+                                    partes = texto.split(" ", 1)
+                                    if len(partes) > 1:
+                                        apellidos.append(partes[0].strip().upper())
+                                        nombres.append(partes[1].strip().upper())
+                                    else:
+                                        apellidos.append(texto.upper())
+                                        nombres.append("")
+                        else:
+                            apellidos = [""] * len(df_crudo)
+                            nombres = [""] * len(df_crudo)
+                    else:
+                        if cfg['col_apellido_sep'] != "No incluir":
+                            apellidos = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[cfg['col_apellido_sep']]]
+                        else:
+                            apellidos = [""] * len(df_crudo)
+                            
+                        if cfg['col_nombre_sep'] != "No incluir":
+                            nombres = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[cfg['col_nombre_sep']]]
+                        else:
+                            nombres = [""] * len(df_crudo)
+
+                    df_oficial['*Apellido'] = apellidos
+                    df_oficial['*Nombre'] = nombres
+                    
+                    if cfg['col_fecha'] != "No incluir":
+                        fechas_limpias = []
+                        for f in df_crudo[cfg['col_fecha']]:
+                            if pd.isna(f) or str(f).lower() == 'nan':
+                                fechas_limpias.append("")
+                            elif isinstance(f, (pd.Timestamp, datetime)):
+                                fechas_limpias.append(f.date())
+                            else:
+                                f_str = str(f)
+                                nums = re.sub(r'[^0-9]', '', f_str)
+                                if len(nums) == 8:
+                                    try: fechas_limpias.append(pd.to_datetime(nums, format='%d%m%Y').date())
+                                    except: fechas_limpias.append(f_str)
+                                else:
+                                    fechas_limpias.append(f_str)
+                        df_oficial['*Fecha de Nacimiento'] = fechas_limpias
+
+                    df_oficial['Acción'] = 'Agregar'
+                    df_oficial['*Tipo Id.'] = 'D.N.I.'
+                    df_oficial['*Nacionalidad'] = 'Argentina'
+                    df_oficial['*Incapacidad'] = 'NO'
+                    
+                    lista_dfs_limpios.append(df_oficial)
+                
+                # Consolidar todos los DataFrames
+                df_consolidado = pd.concat(lista_dfs_limpios, ignore_index=True)
+                
+                # Eliminar Duplicados Globales
+                dnis_con_datos = df_consolidado[df_consolidado['*Nro. Id.'] != '']
+                cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.'], keep='first').sum()
+
+                if cantidad_duplicados > 0:
+                    m_vacios = df_consolidado['*Nro. Id.'] == ''
+                    m_duplicados = df_consolidado.duplicated(subset=['*Nro. Id.'], keep='first')
+                    df_consolidado = df_consolidado[m_vacios | (~m_duplicados)]
+                    df_consolidado.reset_index(drop=True, inplace=True)
+                    st.warning(f"🪄 **Limpieza Automática Global:** Se unificaron los archivos y se eliminaron {cantidad_duplicados} registros duplicados encontrados entre las distintas listas.")
+                else:
+                    st.success("✅ Archivos fusionados exitosamente. No se detectaron duplicados entre las listas.")
+                
+                st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
+                st.write("**Vista Previa del Archivo Unificado:**")
+                st.dataframe(df_consolidado)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                buffer_unif = io.BytesIO()
+                
+                with pd.ExcelWriter(buffer_unif, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
+                    df_consolidado.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
+                    workbook = writer.book
+                    inyectar_listas_desplegables(writer, df_consolidado, workbook, "AP - Personas x Grupo")
+                
+                col_u1, col_u2 = st.columns([1, 1])
+                with col_u1:
+                    st.download_button(
+                        label="📥 Descargar Plantilla Oficial Unificada",
+                        data=buffer_unif.getvalue(),
+                        file_name="AP_Personas_Unificado.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+                with col_u2:
+                    if st.button("🧹 Empezar de cero / Nueva Carga Múltiple", key="btn_unif", use_container_width=True):
+                        st.session_state.reset_unificador += 1
+                        st.rerun()
+
+# ==========================================
+# PESTAÑA 4: CONVERTIDOR DE PDF
 # ==========================================
 with tab_pdf:
     st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Subí la nómina en PDF. Si el sistema detecta una tabla estructurada, generará un <b>Excel</b>. Si solo detecta texto suelto, generará un archivo de <b>Word</b> para que te sea más fácil copiar y pegar los datos.</div>', unsafe_allow_html=True)
@@ -629,7 +834,7 @@ with tab_pdf:
                         st.error(f"Ocurrió un error inesperado al leer el PDF: {e}")
 
 # ==========================================
-# PESTAÑA 4: COTIZACIONES FRECUENTES
+# PESTAÑA 5: COTIZACIONES FRECUENTES
 # ==========================================
 with tab_cotizaciones:
     st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Descargá rápidamente las cotizaciones de referencia o tarifarios vigentes sin tener que buscarlos en tu PC.</div>', unsafe_allow_html=True)
