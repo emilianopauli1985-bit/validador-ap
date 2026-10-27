@@ -5,6 +5,7 @@ import io
 from collections import Counter
 import re
 import string
+import os
 
 # Configuración inicial de la página
 st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
@@ -61,7 +62,7 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
         
     worksheet_dv.hide()
 
-# Fondo de pantalla y estilos de pestañas (sin afectar al uploader)
+# Fondo de pantalla y estilos de pestañas
 st.markdown(
     """
     <style>
@@ -80,7 +81,7 @@ st.markdown(
         padding: 10px;
     }
 
-    /* Textos descriptivos de herramientas (Etiquetas de inputs) */
+    /* Textos descriptivos de herramientas */
     label[data-testid="stWidgetLabel"] p {
         color: white !important;
         font-size: 16px !important;
@@ -104,7 +105,6 @@ st.markdown(
         margin: 0 !important;
     }
     
-    /* TEXTO BLANCO EN TODAS LAS PESTAÑAS SIMULANDO AL TÍTULO */
     button[data-baseweb="tab"] div[data-testid="stMarkdownContainer"] p {
         color: white !important;
         font-size: 18px !important;
@@ -125,13 +125,11 @@ st.markdown(
         text-shadow: 2px 2px 5px rgba(0,0,0,0.8) !important;
     }
 
-    /* Ocultar barra inferior fea nativa */
     div[data-baseweb="tab-highlight"], 
     div[data-baseweb="tab-border"] {
         display: none !important;
         background-color: transparent !important;
     }
-    /* ============================================ */
     </style>
     """,
     unsafe_allow_html=True
@@ -140,7 +138,7 @@ st.markdown(
 st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente Operativo - Accidentes Personales</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
-tab_armador, tab_validador, tab_pdf = st.tabs(["🪄 Armar Excel (Limpiador)", "✅ Validar Carga", "📄 PDF a Excel / Word"])
+tab_armador, tab_validador, tab_pdf, tab_cotizaciones = st.tabs(["🪄 Armar Excel", "✅ Validar Carga", "📄 PDF a Excel / Word", "📚 Cotizaciones Frecuentes"])
 
 # ==========================================
 # PESTAÑA 1: ARMADOR / LIMPIADOR DE DATOS CRUDOS
@@ -154,7 +152,6 @@ with tab_armador:
     
     col1a, col2a = st.columns([2, 3])
     with col1a:
-        # Clave dinámica para permitir el reseteo
         archivo_crudo = st.file_uploader("Subí el Excel crudo del cliente", type=["xlsx", "xls", "csv"], key=f"uploader_armador_{st.session_state.reset_armador}")
     
     if archivo_crudo is not None:
@@ -173,17 +170,29 @@ with tab_armador:
             st.write("### 📌 Mapeo de Columnas")
             st.write("Indicá en qué columna del Excel del cliente se encuentra cada dato:")
             
-            col_map1, col_map2, col_map3 = st.columns(3)
+            # --- AGREGADO: NUEVO DESPLEGABLE PARA ID DE PERSONA (4 COLUMNAS) ---
+            col_map1, col_map2, col_map3, col_map4 = st.columns(4)
             with col_map1:
                 col_dni = st.selectbox("Columna de DNI:", options=columnas_disponibles)
             with col_map2:
-                col_nombre = st.selectbox("Columna de Nombre y Apellido:", options=columnas_disponibles)
+                col_nombre = st.selectbox("Nombre y Apellido:", options=columnas_disponibles)
             with col_map3:
-                col_fecha = st.selectbox("Columna de Fecha de Nacimiento:", options=columnas_disponibles)
+                col_fecha = st.selectbox("Fecha de Nacimiento:", options=columnas_disponibles)
+            with col_map4:
+                col_id_persona = st.selectbox("ID Persona (Opcional):", options=columnas_disponibles)
                 
             if st.button("Procesar y Generar Plantilla Oficial"):
-                columnas_oficiales = ['Acción', '*Tipo Id.', '*Nro. Id.', '*Fecha de Nacimiento', '*Apellido', '*Nombre', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
+                # --- NUEVO ORDEN DE COLUMNAS APLICADO ---
+                columnas_oficiales = ['Acción', '*Tipo Id.', '*Nro. Id.', '*Apellido', '*Nombre', '*Fecha de Nacimiento', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
+                
+                # Si el usuario mapeó el ID de Persona, lo insertamos en la posición 1 (entre Acción y Tipo Id.)
+                if col_id_persona != "No incluir":
+                    columnas_oficiales.insert(1, 'ID de Persona')
+                    
                 df_oficial = pd.DataFrame(columns=columnas_oficiales)
+                
+                if col_id_persona != "No incluir":
+                    df_oficial['ID de Persona'] = df_crudo[col_id_persona].fillna("")
                 
                 if col_dni != "No incluir":
                     df_oficial['*Nro. Id.'] = df_crudo[col_dni].apply(lambda x: re.sub(r'[^0-9]', '', str(x)) if str(x).lower() != 'nan' and pd.notna(x) else '')
@@ -243,7 +252,6 @@ with tab_armador:
                     workbook = writer.book
                     inyectar_listas_desplegables(writer, df_oficial, workbook, "AP - Personas x Grupo")
                 
-                # Agregamos botones en columnas
                 col_d1, col_d2 = st.columns([1, 1])
                 with col_d1:
                     st.download_button(
@@ -268,7 +276,6 @@ with tab_armador:
 with tab_validador:
     col1b, col2b = st.columns([2, 3])
     with col1b:
-        # Clave dinámica para permitir el reseteo
         archivo_agente = st.file_uploader("Seleccioná el archivo Excel listo (.xlsx)", type=["xlsx"], key=f"uploader_validador_{st.session_state.reset_validador}")
 
     if archivo_agente is not None:
@@ -464,7 +471,6 @@ with tab_validador:
                     idx_inicio = len(df.columns) - len(columnas_con_errores)
                     worksheet.set_column(idx_inicio, len(df.columns)-1, 25, formato_amarillo)
 
-            # Agregamos botones en columnas
             col_d1, col_d2 = st.columns([1, 1])
             with col_d1:
                 st.download_button(
@@ -490,7 +496,6 @@ with tab_pdf:
     
     col1c, col2c = st.columns([2, 3])
     with col1c:
-        # Clave dinámica para permitir el reseteo
         archivo_pdf = st.file_uploader("Subí el PDF del cliente", type=["pdf"], key=f"uploader_pdf_{st.session_state.reset_pdf}")
     
     if archivo_pdf is not None:
@@ -578,3 +583,39 @@ with tab_pdf:
                         
                     except Exception as e:
                         st.error(f"Ocurrió un error inesperado al leer el PDF: {e}")
+
+# ==========================================
+# PESTAÑA 4: COTIZACIONES FRECUENTES
+# ==========================================
+with tab_cotizaciones:
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Descargá rápidamente las cotizaciones de referencia o tarifarios vigentes sin tener que buscarlos en tu PC.</div>', unsafe_allow_html=True)
+    
+    ruta_cotizaciones = "cotizaciones"
+    
+    try:
+        if os.path.exists(ruta_cotizaciones):
+            archivos_pdf = [f for f in os.listdir(ruta_cotizaciones) if f.lower().endswith('.pdf')]
+            
+            if archivos_pdf:
+                st.write("### 📄 Archivos disponibles:")
+                st.write("Hacé clic en cualquier botón para descargar el PDF:")
+                
+                columnas = st.columns(3)
+                
+                for index, archivo in enumerate(archivos_pdf):
+                    with open(os.path.join(ruta_cotizaciones, archivo), "rb") as pdf_file:
+                        col_actual = columnas[index % 3]
+                        col_actual.download_button(
+                            label=f"⬇️ {archivo.replace('.pdf', '')}",
+                            data=pdf_file,
+                            file_name=archivo,
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+            else:
+                st.info("ℹ️ La carpeta 'cotizaciones' existe, pero todavía no subiste ningún PDF adentro.")
+        else:
+            st.warning("⚠️ Todavía no se creó la carpeta **'cotizaciones'** en tu repositorio de GitHub. Mirá las instrucciones para activarla.")
+            
+    except Exception as e:
+        st.error(f"Error al leer la carpeta de cotizaciones: {e}")
