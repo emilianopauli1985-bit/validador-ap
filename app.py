@@ -62,11 +62,11 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
         
     worksheet_dv.hide()
 
-# Fondo de pantalla con filtro oscuro integrado
+# Fondo de pantalla y estilos de contraste visual
 st.markdown(
     """
     <style>
-    /* Fondo general con filtro oscurecedor para resaltar botones y texto */
+    /* Fondo general con filtro oscurecedor */
     .stApp {
         background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/istockphoto-2046622743-612x612.jpg");
         background-size: cover;
@@ -74,14 +74,37 @@ st.markdown(
         background-attachment: fixed;
     }
     
-    /* Paneles y tablas */
+    /* Paneles, Alertas y Tablas (Mantienen fondo claro) */
     .stAlert, [data-testid="stDataFrame"] {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 10px;
         padding: 10px;
     }
 
-    /* Textos descriptivos de herramientas */
+    /* 1. Forzar textos normales, subtítulos y opciones de Radio a BLANCO para contrastar */
+    div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stMarkdownContainer"] h1,
+    div[data-testid="stMarkdownContainer"] h2,
+    div[data-testid="stMarkdownContainer"] h3,
+    div[data-testid="stMarkdownContainer"] h4 {
+        color: #FFFFFF !important;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    }
+
+    /* 2. Excepción A: Textos dentro de alertas deben ser oscuros */
+    [data-testid="stAlert"] div[data-testid="stMarkdownContainer"] p,
+    [data-testid="stAlert"] div[data-testid="stMarkdownContainer"] h3 {
+        color: #262730 !important;
+        text-shadow: none !important;
+    }
+
+    /* 3. Excepción B: Caja inicial con instrucciones manuales en fondo blanco */
+    div[style*="background-color: rgba(255, 255, 255, 0.95)"] {
+        color: #262730 !important;
+        text-shadow: none !important;
+    }
+
+    /* Etiquetas (Ej: Columna de DNI) */
     label[data-testid="stWidgetLabel"] p {
         color: white !important;
         font-size: 16px !important;
@@ -89,43 +112,33 @@ st.markdown(
         text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
 
-    /* ================= PESTAÑAS ================= */
+    /* ================= PESTAÑAS (TABS) ================= */
     .stTabs [data-baseweb="tab-list"] {
         gap: 15px !important;
         background-color: transparent !important;
         flex-wrap: wrap !important;
     }
 
-    /* Pestaña Inactiva */
-    button[data-baseweb="tab"] {
-        background-color: rgba(0, 0, 0, 0.6) !important; 
-        border-radius: 8px !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        padding: 12px 24px !important;
-        margin: 0 !important;
-    }
-    
+    /* Pestaña Inactiva: Gris claro para leer sin seleccionar */
     button[data-baseweb="tab"] div[data-testid="stMarkdownContainer"] p {
-        color: white !important;
-        font-size: 18px !important;
-        font-weight: 600 !important; 
-        text-shadow: 1px 1px 4px rgba(0,0,0,0.6) !important;
+        color: #C0C0C0 !important; 
+        font-size: 17px !important;
+        font-weight: normal !important;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.8) !important;
     }
 
-    /* Pestaña Activa */
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #900000 !important; 
-        border: 2px solid white !important;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.4) !important;
+    /* Pestaña Activa: Blanco brillante y negrita */
+    button[data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
+        color: #FFFFFF !important; 
+        font-weight: bold !important; 
+        text-shadow: 1px 1px 5px rgba(0,0,0,0.8) !important;
+    }
+
+    /* Barra indicadora blanca */
+    div[data-baseweb="tab-highlight"] {
+        background-color: #FFFFFF !important;
     }
     
-    button[data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
-        color: white !important; 
-        font-weight: 600 !important; 
-        text-shadow: 2px 2px 5px rgba(0,0,0,0.8) !important;
-    }
-
-    div[data-baseweb="tab-highlight"], 
     div[data-baseweb="tab-border"] {
         display: none !important;
         background-color: transparent !important;
@@ -144,7 +157,7 @@ tab_armador, tab_validador, tab_pdf, tab_cotizaciones = st.tabs(["🪄 Armar Exc
 # PESTAÑA 1: ARMADOR / LIMPIADOR DE DATOS CRUDOS
 # ==========================================
 with tab_armador:
-    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Subí el Excel desordenado que te envió la empresa. Podés indicarle al sistema en qué fila empiezan los títulos para saltear logos o membretes.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Subí el Excel desordenado que te envió la empresa. Podés indicarle al sistema en qué fila empiezan los títulos para saltear logos o membretes.</div>', unsafe_allow_html=True)
     
     col_fila, col_espacio = st.columns([2, 3])
     with col_fila:
@@ -166,7 +179,7 @@ with tab_armador:
                 
             columnas_disponibles = ["No incluir"] + list(df_crudo.columns)
             
-            st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px;">', unsafe_allow_html=True)
+            st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
             st.write("### 📌 Mapeo de Columnas")
             
             formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido en el Excel original?", ["En una sola columna", "En columnas separadas"], horizontal=True)
@@ -523,7 +536,7 @@ with tab_validador:
 # PESTAÑA 3: CONVERTIDOR DE PDF
 # ==========================================
 with tab_pdf:
-    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Subí la nómina en PDF. Si el sistema detecta una tabla estructurada, generará un <b>Excel</b>. Si solo detecta texto suelto, generará un archivo de <b>Word</b> para que te sea más fácil copiar y pegar los datos.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Subí la nómina en PDF. Si el sistema detecta una tabla estructurada, generará un <b>Excel</b>. Si solo detecta texto suelto, generará un archivo de <b>Word</b> para que te sea más fácil copiar y pegar los datos.</div>', unsafe_allow_html=True)
     
     col1c, col2c = st.columns([2, 3])
     with col1c:
@@ -554,7 +567,7 @@ with tab_pdf:
                                 if texto:
                                     texto_crudo.extend(texto.split('\n'))
                         
-                        st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px;">', unsafe_allow_html=True)
+                        st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
                         
                         if todas_las_filas:
                             st.success("✅ ¡Se detectaron tablas estructuradas! Generando archivo Excel...")
@@ -619,7 +632,7 @@ with tab_pdf:
 # PESTAÑA 4: COTIZACIONES FRECUENTES
 # ==========================================
 with tab_cotizaciones:
-    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px;">Descargá rápidamente las cotizaciones de referencia o tarifarios vigentes sin tener que buscarlos en tu PC.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Descargá rápidamente las cotizaciones de referencia o tarifarios vigentes sin tener que buscarlos en tu PC.</div>', unsafe_allow_html=True)
     
     ruta_cotizaciones = "cotizaciones"
     
