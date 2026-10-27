@@ -68,7 +68,7 @@ st.markdown(
     <style>
     /* Fondo general con filtro oscurecedor para resaltar botones y texto */
     .stApp {
-        background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/L2_Wallpaper-06.jpg");
+        background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/istockphoto-2046622743-612x612.jpg");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
