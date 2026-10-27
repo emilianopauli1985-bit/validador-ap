@@ -62,13 +62,13 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
         
     worksheet_dv.hide()
 
-# Fondo de pantalla y estilos de pestañas
+# Fondo de pantalla con filtro oscuro integrado
 st.markdown(
     """
     <style>
-    /* Fondo general */
+    /* Fondo general con filtro oscurecedor para resaltar botones y texto */
     .stApp {
-        background-image: url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/L2_Wallpaper-05.jpg");
+        background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/L2_Wallpaper-06.jpg");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
@@ -169,7 +169,6 @@ with tab_armador:
             st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px;">', unsafe_allow_html=True)
             st.write("### 📌 Mapeo de Columnas")
             
-            # --- NUEVO SELECTOR PARA ESTRUCTURA DE NOMBRES ---
             formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido en el Excel original?", ["En una sola columna", "En columnas separadas"], horizontal=True)
             
             if formato_nombres == "En una sola columna":
@@ -203,7 +202,6 @@ with tab_armador:
                 if col_dni != "No incluir":
                     df_oficial['*Nro. Id.'] = df_crudo[col_dni].apply(lambda x: re.sub(r'[^0-9]', '', str(x)) if str(x).lower() != 'nan' and pd.notna(x) else '')
                 
-                # --- NUEVA LÓGICA DE EXTRACCIÓN DE NOMBRES ---
                 apellidos = []
                 nombres = []
                 
@@ -229,7 +227,7 @@ with tab_armador:
                     else:
                         apellidos = [""] * len(df_crudo)
                         nombres = [""] * len(df_crudo)
-                else: # En columnas separadas
+                else: 
                     if col_apellido_sep != "No incluir":
                         apellidos = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[col_apellido_sep]]
                     else:
@@ -242,7 +240,6 @@ with tab_armador:
 
                 df_oficial['*Apellido'] = apellidos
                 df_oficial['*Nombre'] = nombres
-                # ---------------------------------------------
                 
                 if col_fecha != "No incluir":
                     fechas_limpias = []
