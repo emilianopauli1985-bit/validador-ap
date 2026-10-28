@@ -65,21 +65,39 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
     worksheet_dv.hide()
 
 # =========================================================
-# FUNCIONES DE LIMPIEZA Y PINTADO (ESTILOS)
+# FUNCIONES DE LIMPIEZA INTELIGENTE Y ESTILOS
 # =========================================================
 def procesar_dni_cuil(valor):
+    """Limpia el DNI eliminando prefijos y sufijos de CUIL según la presencia de guiones"""
     if pd.isna(valor): return ""
     texto = str(valor).strip()
     if texto.lower() == 'nan' or not texto: return ""
     
-    if '-' in texto:
+    # 1. Si tiene dos guiones o más (ej: 20-31784656-9) se queda con el medio
+    if texto.count('-') >= 2:
         partes = texto.split('-')
-        if len(partes) >= 3:
-            texto = "".join(partes[1:-1])
-        elif len(partes) == 2:
-            texto = partes[0]
-            
-    return re.sub(r'[^0-9]', '', texto)
+        texto = "".join(partes[1:-1])
+        return re.sub(r'[^0-9]', '', texto)
+        
+    # 2. Si tiene un solo guion
+    elif texto.count('-') == 1:
+        partes = texto.split('-')
+        if len(partes[0]) <= 2:
+            # Guion al inicio (ej: 20-317846569). Saca prefijo y último dígito.
+            texto = partes[1][:-1]
+        else:
+            # Guion al final (ej: 2031784656-9). Saca sufijo y los dos primeros dígitos.
+            texto = partes[0][2:]
+        return re.sub(r'[^0-9]', '', texto)
+        
+    # 3. Si no tiene guiones (todo pegado o con puntos)
+    else:
+        numeros = re.sub(r'[^0-9]', '', texto)
+        # Si tiene 10 u 11 digitos, asumimos que es CUIL pegado y sacamos las puntas
+        if len(numeros) >= 10:
+            return numeros[2:-1]
+        # Si tiene 8 o menos, es DNI directo
+        return numeros
 
 def pintar_duplicados(s):
     """Función para colorear de amarillo las celdas duplicadas en la vista web."""
@@ -172,7 +190,7 @@ with tab_armador:
             
             if formato_nombres == "En una sola columna":
                 c1, c2, c3, c4 = st.columns(4)
-                with c1: col_dni = st.selectbox("Columna de DNI:", options=columnas_disponibles)
+                with c1: col_dni = st.selectbox("Columna de DNI o CUIL:", options=columnas_disponibles)
                 with c2: col_nombre_completo = st.selectbox("Nombre y Apellido juntos:", options=columnas_disponibles)
                 with c3: col_fecha = st.selectbox("Fecha de Nacimiento:", options=columnas_disponibles)
                 with c4: col_id_persona = st.selectbox("ID Persona (Opcional):", options=columnas_disponibles)
@@ -180,7 +198,7 @@ with tab_armador:
                 col_nombre_sep = "No incluir"
             else:
                 c1, c2, c3, c4, c5 = st.columns(5)
-                with c1: col_dni = st.selectbox("Columna de DNI:", options=columnas_disponibles)
+                with c1: col_dni = st.selectbox("Columna de DNI o CUIL:", options=columnas_disponibles)
                 with c2: col_apellido_sep = st.selectbox("Columna de Apellido:", options=columnas_disponibles)
                 with c3: col_nombre_sep = st.selectbox("Columna de Nombre:", options=columnas_disponibles)
                 with c4: col_fecha = st.selectbox("Fecha Nacimiento:", options=columnas_disponibles)
@@ -262,7 +280,6 @@ with tab_armador:
                 df_oficial['*Nacionalidad'] = 'Argentina'
                 df_oficial['*Incapacidad'] = 'NO'
                 
-                # --- LÓGICA DE DUPLICADOS EXACTOS ---
                 dnis_con_datos = df_oficial[df_oficial['*Nro. Id.'] != '']
                 cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first').sum()
 
@@ -275,14 +292,12 @@ with tab_armador:
                 else:
                     st.success("✅ Plantilla generada exitosamente.")
                 
-                # --- DETECCIÓN DE DUPLICADOS PARCIALES (MISMO DNI, DISTINTO NOMBRE) ---
                 dnis_con_datos_final = df_oficial[df_oficial['*Nro. Id.'] != '']
                 cant_dup_parciales = dnis_con_datos_final.duplicated(subset=['*Nro. Id.'], keep=False).sum()
 
                 if cant_dup_parciales > 0:
-                    st.warning(f"⚠️ **¡Alerta de revisión!** Quedaron {cant_dup_parciales} registros con el mismo DNI pero distintos nombres. En la tabla de abajo y en el Excel descargable los vas a ver marcados en amarillo para que los analices.")
+                    st.warning(f"⚠️ **¡Alerta de revisión!** Quedaron {cant_dup_parciales} registros con el mismo DNI pero distintos nombres. Se pintaron de amarillo para que los analices.")
                 
-                # Pintar duplicados en la pantalla web
                 st.dataframe(df_oficial.style.apply(pintar_duplicados, subset=['*Nro. Id.']))
                 
                 buffer_armado = io.BytesIO()
@@ -293,7 +308,6 @@ with tab_armador:
                     worksheet = writer.sheets['AP - Personas x Grupo']
                     inyectar_listas_desplegables(writer, df_oficial, workbook, "AP - Personas x Grupo")
                     
-                    # --- INYECTAR FORMATO CONDICIONAL EN EL EXCEL ---
                     idx_dni = list(df_oficial.columns).index('*Nro. Id.')
                     letra_col_dni = string.ascii_uppercase[idx_dni]
                     rango_dni = f"{letra_col_dni}2:{letra_col_dni}5000"
@@ -539,69 +553,85 @@ with tab_validador:
             st.error(f"Error al leer el archivo. Detalle técnico: {e}")
 
 # ==========================================
-# PESTAÑA 3: UNIFICADOR DE EXCELS
+# PESTAÑA 3: UNIFICADOR DE EXCELS / HOJAS
 # ==========================================
 with tab_unificador:
-    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Subí varios archivos Excel a la vez (de distintas sucursales). Configurá cada uno por separado y unificálos en una sola Plantilla Oficial.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Subí archivos Excel. Si un archivo tiene <b>varias hojas o pestañas</b>, el sistema las detectará automáticamente y las separará para que configures cada una a tu gusto y unifiques todo en una sola Plantilla Oficial.</div>', unsafe_allow_html=True)
     
     archivos_multiples = st.file_uploader("Subí todos los archivos que quieras fusionar", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key=f"uploader_unif_{st.session_state.reset_unificador}")
     
     if archivos_multiples:
         configs = []
-        st.write("### ⚙️ Configuración de Archivos")
+        st.write("### ⚙️ Configuración de Archivos y Hojas")
         
-        for idx, archivo in enumerate(archivos_multiples):
-            with st.expander(f"📁 Configurar archivo {idx+1}: {archivo.name}", expanded=True):
-                archivo.seek(0)
-                col_f_1, col_f_2 = st.columns([2, 3])
-                with col_f_1:
-                    fila_titulos = st.number_input(f"Fila de títulos en este archivo:", min_value=1, value=1, key=f"fila_unif_{idx}")
+        idx_global = 0
+        total_hojas_activas = 0
+        
+        for archivo in archivos_multiples:
+            archivo.seek(0)
+            if archivo.name.endswith('.csv'):
+                hojas = [("CSV", archivo)]
+            else:
+                xls = pd.ExcelFile(archivo)
+                hojas = [(sheet, archivo) for sheet in xls.sheet_names]
                 
-                try:
-                    filas_a_saltar = int(fila_titulos) - 1
-                    if archivo.name.endswith('.csv'):
-                        df_tmp = pd.read_csv(archivo, skiprows=filas_a_saltar, nrows=5)
-                    else:
-                        df_tmp = pd.read_excel(archivo, skiprows=filas_a_saltar, nrows=5)
-                    
-                    columnas_disponibles = ["No incluir"] + list(df_tmp.columns)
-                    
-                    formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido acá?", ["En una sola columna", "En columnas separadas"], horizontal=True, key=f"fmt_nom_unif_{idx}")
-                    
-                    if formato_nombres == "En una sola columna":
-                        c1, c2, c3, c4 = st.columns(4)
-                        with c1: col_dni = st.selectbox("DNI:", options=columnas_disponibles, key=f"dni1_{idx}")
-                        with c2: col_nombre_completo = st.selectbox("Nombre completo:", options=columnas_disponibles, key=f"nomc_{idx}")
-                        with c3: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec1_{idx}")
-                        with c4: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id1_{idx}")
-                        col_apellido_sep = "No incluir"
-                        col_nombre_sep = "No incluir"
-                    else:
-                        c1, c2, c3, c4, c5 = st.columns(5)
-                        with c1: col_dni = st.selectbox("DNI:", options=columnas_disponibles, key=f"dni2_{idx}")
-                        with c2: col_apellido_sep = st.selectbox("Apellido:", options=columnas_disponibles, key=f"ape_{idx}")
-                        with c3: col_nombre_sep = st.selectbox("Nombre:", options=columnas_disponibles, key=f"nom_{idx}")
-                        with c4: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec2_{idx}")
-                        with c5: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id2_{idx}")
-                        col_nombre_completo = "No incluir"
+            for nombre_hoja, arch in hojas:
+                idx_global += 1
+                with st.expander(f"📁 Archivo: {arch.name} | 📄 Hoja: {nombre_hoja}", expanded=True):
+                    incluir_hoja = st.checkbox(f"✅ Incluir esta hoja en la unificación", value=True, key=f"incluir_{idx_global}")
+                    if incluir_hoja:
+                        total_hojas_activas += 1
+                        col_f_1, col_f_2 = st.columns([2, 3])
+                        with col_f_1:
+                            fila_titulos = st.number_input(f"Fila de títulos:", min_value=1, value=1, key=f"fila_unif_{idx_global}")
                         
-                    configs.append({
-                        'archivo': archivo,
-                        'fila_titulos': fila_titulos,
-                        'formato_nombres': formato_nombres,
-                        'col_dni': col_dni,
-                        'col_nombre_completo': col_nombre_completo,
-                        'col_apellido_sep': col_apellido_sep,
-                        'col_nombre_sep': col_nombre_sep,
-                        'col_fecha': col_fecha,
-                        'col_id_persona': col_id_persona
-                    })
-                except Exception as e:
-                    st.error(f"Error leyendo {archivo.name}. Verificá la fila de títulos. Detalle: {e}")
+                        try:
+                            filas_a_saltar = int(fila_titulos) - 1
+                            arch.seek(0)
+                            if arch.name.endswith('.csv'):
+                                df_tmp = pd.read_csv(arch, skiprows=filas_a_saltar, nrows=5)
+                            else:
+                                df_tmp = pd.read_excel(arch, sheet_name=nombre_hoja, skiprows=filas_a_saltar, nrows=5)
+                            
+                            columnas_disponibles = ["No incluir"] + list(df_tmp.columns)
+                            
+                            formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido acá?", ["En una sola columna", "En columnas separadas"], horizontal=True, key=f"fmt_nom_unif_{idx_global}")
+                            
+                            if formato_nombres == "En una sola columna":
+                                c1, c2, c3, c4 = st.columns(4)
+                                with c1: col_dni = st.selectbox("DNI/CUIL:", options=columnas_disponibles, key=f"dni1_{idx_global}")
+                                with c2: col_nombre_completo = st.selectbox("Nombre completo:", options=columnas_disponibles, key=f"nomc_{idx_global}")
+                                with c3: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec1_{idx_global}")
+                                with c4: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id1_{idx_global}")
+                                col_apellido_sep = "No incluir"
+                                col_nombre_sep = "No incluir"
+                            else:
+                                c1, c2, c3, c4, c5 = st.columns(5)
+                                with c1: col_dni = st.selectbox("DNI/CUIL:", options=columnas_disponibles, key=f"dni2_{idx_global}")
+                                with c2: col_apellido_sep = st.selectbox("Apellido:", options=columnas_disponibles, key=f"ape_{idx_global}")
+                                with c3: col_nombre_sep = st.selectbox("Nombre:", options=columnas_disponibles, key=f"nom_{idx_global}")
+                                with c4: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec2_{idx_global}")
+                                with c5: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id2_{idx_global}")
+                                col_nombre_completo = "No incluir"
+                                
+                            configs.append({
+                                'archivo': arch,
+                                'nombre_hoja': nombre_hoja,
+                                'fila_titulos': fila_titulos,
+                                'formato_nombres': formato_nombres,
+                                'col_dni': col_dni,
+                                'col_nombre_completo': col_nombre_completo,
+                                'col_apellido_sep': col_apellido_sep,
+                                'col_nombre_sep': col_nombre_sep,
+                                'col_fecha': col_fecha,
+                                'col_id_persona': col_id_persona
+                            })
+                        except Exception as e:
+                            st.error(f"Error leyendo la hoja '{nombre_hoja}'. Verificá la fila de títulos. Detalle: {e}")
 
-        if len(configs) == len(archivos_multiples):
+        if len(configs) == total_hojas_activas and total_hojas_activas > 0:
             st.markdown("---")
-            if st.button("🔗 Consolidar Archivos y Generar Plantilla Oficial", use_container_width=True):
+            if st.button("🔗 Consolidar Hojas y Generar Plantilla Oficial", use_container_width=True):
                 lista_dfs_limpios = []
                 tiene_id = any(cfg['col_id_persona'] != "No incluir" for cfg in configs)
                 
@@ -611,7 +641,7 @@ with tab_unificador:
                     if cfg['archivo'].name.endswith('.csv'):
                         df_crudo = pd.read_csv(cfg['archivo'], skiprows=filas_a_saltar)
                     else:
-                        df_crudo = pd.read_excel(cfg['archivo'], skiprows=filas_a_saltar)
+                        df_crudo = pd.read_excel(cfg['archivo'], sheet_name=cfg['nombre_hoja'], skiprows=filas_a_saltar)
                     
                     df_crudo = df_crudo.dropna(how='all')
                     
@@ -694,7 +724,6 @@ with tab_unificador:
                 
                 df_consolidado = pd.concat(lista_dfs_limpios, ignore_index=True)
                 
-                # --- LÓGICA DE DUPLICADOS EN UNIFICADOR ---
                 dnis_con_datos = df_consolidado[df_consolidado['*Nro. Id.'] != '']
                 cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first').sum()
 
@@ -703,16 +732,15 @@ with tab_unificador:
                     m_duplicados = df_consolidado.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first')
                     df_consolidado = df_consolidado[m_vacios | (~m_duplicados)]
                     df_consolidado.reset_index(drop=True, inplace=True)
-                    st.success(f"🪄 **Limpieza Automática Global:** Se eliminaron {cantidad_duplicados} registros idénticos encontrados entre las distintas listas.")
+                    st.success(f"🪄 **Limpieza Automática Global:** Se unificaron las hojas y se eliminaron {cantidad_duplicados} registros idénticos.")
                 else:
-                    st.success("✅ Archivos fusionados exitosamente.")
+                    st.success("✅ Hojas fusionadas exitosamente.")
                     
-                # Detección de parciales para pintar
                 dnis_con_datos_final = df_consolidado[df_consolidado['*Nro. Id.'] != '']
                 cant_dup_parciales = dnis_con_datos_final.duplicated(subset=['*Nro. Id.'], keep=False).sum()
 
                 if cant_dup_parciales > 0:
-                    st.warning(f"⚠️ **¡Alerta de revisión!** Quedaron {cant_dup_parciales} registros con el mismo DNI pero distintos nombres entre los archivos. Se pintaron de amarillo para que los analices.")
+                    st.warning(f"⚠️ **¡Alerta de revisión!** Quedaron {cant_dup_parciales} registros con el mismo DNI pero distintos nombres entre las diferentes listas. Se pintaron de amarillo para que los analices.")
                 
                 st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
                 st.write("**Vista Previa del Archivo Unificado:**")
@@ -727,7 +755,6 @@ with tab_unificador:
                     worksheet = writer.sheets['AP - Personas x Grupo']
                     inyectar_listas_desplegables(writer, df_consolidado, workbook, "AP - Personas x Grupo")
                     
-                    # --- INYECTAR FORMATO CONDICIONAL EN EL EXCEL ---
                     idx_dni = list(df_consolidado.columns).index('*Nro. Id.')
                     letra_col_dni = string.ascii_uppercase[idx_dni]
                     rango_dni = f"{letra_col_dni}2:{letra_col_dni}5000"
