@@ -64,87 +64,69 @@ def inyectar_listas_desplegables(writer, df_export, workbook, sheet_name):
         
     worksheet_dv.hide()
 
+# =========================================================
+# FUNCIONES DE LIMPIEZA Y PINTADO (ESTILOS)
+# =========================================================
+def procesar_dni_cuil(valor):
+    if pd.isna(valor): return ""
+    texto = str(valor).strip()
+    if texto.lower() == 'nan' or not texto: return ""
+    
+    if '-' in texto:
+        partes = texto.split('-')
+        if len(partes) >= 3:
+            texto = "".join(partes[1:-1])
+        elif len(partes) == 2:
+            texto = partes[0]
+            
+    return re.sub(r'[^0-9]', '', texto)
+
+def pintar_duplicados(s):
+    """Función para colorear de amarillo las celdas duplicadas en la vista web."""
+    dups = s.duplicated(keep=False) & (s != '')
+    return ['background-color: #FFF2CC; color: #9C6500; font-weight: bold' if v else '' for v in dups]
+
 # Fondo de pantalla y estilos de contraste visual
 st.markdown(
     """
     <style>
-    /* Fondo general con filtro oscurecedor */
     .stApp {
         background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url("https://raw.githubusercontent.com/emilianopauli1985-bit/validador-ap/main/istockphoto-2046622743-612x612.jpg");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
     }
-    
-    /* Paneles, Alertas y Tablas (Mantienen fondo claro) */
     .stAlert, [data-testid="stDataFrame"] {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 10px;
         padding: 10px;
     }
-
-    /* 1. Forzar textos normales, subtítulos y opciones de Radio a BLANCO para contrastar */
-    div[data-testid="stMarkdownContainer"] p,
-    div[data-testid="stMarkdownContainer"] h1,
-    div[data-testid="stMarkdownContainer"] h2,
-    div[data-testid="stMarkdownContainer"] h3,
+    div[data-testid="stMarkdownContainer"] p, div[data-testid="stMarkdownContainer"] h1,
+    div[data-testid="stMarkdownContainer"] h2, div[data-testid="stMarkdownContainer"] h3,
     div[data-testid="stMarkdownContainer"] h4 {
-        color: #FFFFFF !important;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        color: #FFFFFF !important; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
     }
-
-    /* 2. Excepción A: Textos dentro de alertas deben ser oscuros */
     [data-testid="stAlert"] div[data-testid="stMarkdownContainer"] p,
     [data-testid="stAlert"] div[data-testid="stMarkdownContainer"] h3 {
-        color: #262730 !important;
-        text-shadow: none !important;
+        color: #262730 !important; text-shadow: none !important;
     }
-
-    /* 3. Excepción B: Caja inicial con instrucciones manuales en fondo blanco */
     div[style*="background-color: rgba(255, 255, 255, 0.95)"] {
-        color: #262730 !important;
-        text-shadow: none !important;
+        color: #262730 !important; text-shadow: none !important;
     }
-
-    /* Etiquetas (Ej: Columna de DNI) */
     label[data-testid="stWidgetLabel"] p {
-        color: white !important;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
+        color: white !important; font-size: 16px !important; font-weight: 600 !important; text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
     }
-
-    /* ================= PESTAÑAS (TABS) ================= */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 15px !important;
-        background-color: transparent !important;
-        flex-wrap: wrap !important;
+        gap: 15px !important; background-color: transparent !important; flex-wrap: wrap !important;
     }
-
-    /* Pestaña Inactiva: Gris claro para leer sin seleccionar */
     button[data-baseweb="tab"] div[data-testid="stMarkdownContainer"] p {
-        color: #C0C0C0 !important; 
-        font-size: 17px !important;
-        font-weight: normal !important;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.8) !important;
+        color: #C0C0C0 !important; font-size: 17px !important; font-weight: normal !important; text-shadow: 1px 1px 3px rgba(0,0,0,0.8) !important;
     }
-
-    /* Pestaña Activa: Blanco brillante y negrita */
     button[data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
-        color: #FFFFFF !important; 
-        font-weight: bold !important; 
-        text-shadow: 1px 1px 5px rgba(0,0,0,0.8) !important;
+        color: #FFFFFF !important; font-weight: bold !important; text-shadow: 1px 1px 5px rgba(0,0,0,0.8) !important;
     }
-
-    /* Barra indicadora blanca */
-    div[data-baseweb="tab-highlight"] {
-        background-color: #FFFFFF !important;
-    }
-    
-    div[data-baseweb="tab-border"] {
-        display: none !important;
-        background-color: transparent !important;
-    }
+    div[data-baseweb="tab-highlight"] { background-color: #FFFFFF !important; }
+    div[data-baseweb="tab-border"] { display: none !important; background-color: transparent !important; }
     </style>
     """,
     unsafe_allow_html=True
@@ -153,7 +135,6 @@ st.markdown(
 st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente Operativo - Accidentes Personales</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
-# NUEVO ORDEN DE PESTAÑAS: Unificador en la posición 3
 tab_armador, tab_validador, tab_unificador, tab_pdf, tab_cotizaciones = st.tabs([
     "🪄 Armar Excel", "✅ Validar Carga", "🔗 Unificar Excels", "📄 PDF a Excel / Word", "📚 Cotizaciones Frecuentes"
 ])
@@ -218,7 +199,7 @@ with tab_armador:
                     df_oficial['ID de Persona'] = df_crudo[col_id_persona].fillna("")
                 
                 if col_dni != "No incluir":
-                    df_oficial['*Nro. Id.'] = df_crudo[col_dni].apply(lambda x: re.sub(r'[^0-9]', '', str(x)) if str(x).lower() != 'nan' and pd.notna(x) else '')
+                    df_oficial['*Nro. Id.'] = df_crudo[col_dni].apply(procesar_dni_cuil)
                 
                 apellidos = []
                 nombres = []
@@ -281,25 +262,45 @@ with tab_armador:
                 df_oficial['*Nacionalidad'] = 'Argentina'
                 df_oficial['*Incapacidad'] = 'NO'
                 
+                # --- LÓGICA DE DUPLICADOS EXACTOS ---
                 dnis_con_datos = df_oficial[df_oficial['*Nro. Id.'] != '']
-                cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.'], keep='first').sum()
+                cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first').sum()
 
                 if cantidad_duplicados > 0:
                     m_vacios = df_oficial['*Nro. Id.'] == ''
-                    m_duplicados = df_oficial.duplicated(subset=['*Nro. Id.'], keep='first')
+                    m_duplicados = df_oficial.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first')
                     df_oficial = df_oficial[m_vacios | (~m_duplicados)]
                     df_oficial.reset_index(drop=True, inplace=True)
-                    st.warning(f"🪄 **Limpieza Automática:** Se detectaron y eliminaron {cantidad_duplicados} registros duplicados (personas repetidas con el mismo DNI).")
+                    st.success(f"🪄 **Limpieza Automática:** Se eliminaron {cantidad_duplicados} registros idénticos (mismo DNI, Nombre y Apellido).")
+                else:
+                    st.success("✅ Plantilla generada exitosamente.")
                 
-                st.success("✅ Plantilla generada exitosamente. Se limpiaron los datos y se aplicaron los valores por defecto y las listas desplegables.")
-                st.dataframe(df_oficial)
+                # --- DETECCIÓN DE DUPLICADOS PARCIALES (MISMO DNI, DISTINTO NOMBRE) ---
+                dnis_con_datos_final = df_oficial[df_oficial['*Nro. Id.'] != '']
+                cant_dup_parciales = dnis_con_datos_final.duplicated(subset=['*Nro. Id.'], keep=False).sum()
+
+                if cant_dup_parciales > 0:
+                    st.warning(f"⚠️ **¡Alerta de revisión!** Quedaron {cant_dup_parciales} registros con el mismo DNI pero distintos nombres. En la tabla de abajo y en el Excel descargable los vas a ver marcados en amarillo para que los analices.")
+                
+                # Pintar duplicados en la pantalla web
+                st.dataframe(df_oficial.style.apply(pintar_duplicados, subset=['*Nro. Id.']))
                 
                 buffer_armado = io.BytesIO()
                 
                 with pd.ExcelWriter(buffer_armado, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
                     df_oficial.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
                     workbook = writer.book
+                    worksheet = writer.sheets['AP - Personas x Grupo']
                     inyectar_listas_desplegables(writer, df_oficial, workbook, "AP - Personas x Grupo")
+                    
+                    # --- INYECTAR FORMATO CONDICIONAL EN EL EXCEL ---
+                    idx_dni = list(df_oficial.columns).index('*Nro. Id.')
+                    letra_col_dni = string.ascii_uppercase[idx_dni]
+                    rango_dni = f"{letra_col_dni}2:{letra_col_dni}5000"
+                    formula = f'=AND({letra_col_dni}2<>"", COUNTIF(${letra_col_dni}$2:${letra_col_dni}$5000,{letra_col_dni}2)>1)'
+                    
+                    formato_amarillo = workbook.add_format({'bg_color': '#FFF2CC', 'font_color': '#9C6500'})
+                    worksheet.conditional_format(rango_dni, {'type': 'formula', 'criteria': formula, 'format': formato_amarillo})
                 
                 col_d1, col_d2 = st.columns([1, 1])
                 with col_d1:
@@ -549,7 +550,6 @@ with tab_unificador:
         configs = []
         st.write("### ⚙️ Configuración de Archivos")
         
-        # Generar un menú de configuración (acordeón) para CADA archivo subido
         for idx, archivo in enumerate(archivos_multiples):
             with st.expander(f"📁 Configurar archivo {idx+1}: {archivo.name}", expanded=True):
                 archivo.seek(0)
@@ -599,7 +599,6 @@ with tab_unificador:
                 except Exception as e:
                     st.error(f"Error leyendo {archivo.name}. Verificá la fila de títulos. Detalle: {e}")
 
-        # Si todos los archivos fueron configurados correctamente, habilitar botón de fusión
         if len(configs) == len(archivos_multiples):
             st.markdown("---")
             if st.button("🔗 Consolidar Archivos y Generar Plantilla Oficial", use_container_width=True):
@@ -616,14 +615,12 @@ with tab_unificador:
                     
                     df_crudo = df_crudo.dropna(how='all')
                     
-                    # Preparar columnas base para este archivo
                     columnas_oficiales = ['Acción', '*Tipo Id.', '*Nro. Id.', '*Apellido', '*Nombre', '*Fecha de Nacimiento', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
                     if tiene_id:
                         columnas_oficiales.insert(1, 'ID de Persona')
                         
                     df_oficial = pd.DataFrame(columns=columnas_oficiales)
                     
-                    # Extraer datos mapeados
                     if tiene_id:
                         if cfg['col_id_persona'] != "No incluir":
                             df_oficial['ID de Persona'] = df_crudo[cfg['col_id_persona']].fillna("")
@@ -631,7 +628,7 @@ with tab_unificador:
                             df_oficial['ID de Persona'] = ""
                             
                     if cfg['col_dni'] != "No incluir":
-                        df_oficial['*Nro. Id.'] = df_crudo[cfg['col_dni']].apply(lambda x: re.sub(r'[^0-9]', '', str(x)) if str(x).lower() != 'nan' and pd.notna(x) else '')
+                        df_oficial['*Nro. Id.'] = df_crudo[cfg['col_dni']].apply(procesar_dni_cuil)
                     
                     apellidos = []
                     nombres = []
@@ -695,25 +692,31 @@ with tab_unificador:
                     
                     lista_dfs_limpios.append(df_oficial)
                 
-                # Consolidar todos los DataFrames
                 df_consolidado = pd.concat(lista_dfs_limpios, ignore_index=True)
                 
-                # Eliminar Duplicados Globales
+                # --- LÓGICA DE DUPLICADOS EN UNIFICADOR ---
                 dnis_con_datos = df_consolidado[df_consolidado['*Nro. Id.'] != '']
-                cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.'], keep='first').sum()
+                cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first').sum()
 
                 if cantidad_duplicados > 0:
                     m_vacios = df_consolidado['*Nro. Id.'] == ''
-                    m_duplicados = df_consolidado.duplicated(subset=['*Nro. Id.'], keep='first')
+                    m_duplicados = df_consolidado.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first')
                     df_consolidado = df_consolidado[m_vacios | (~m_duplicados)]
                     df_consolidado.reset_index(drop=True, inplace=True)
-                    st.warning(f"🪄 **Limpieza Automática Global:** Se unificaron los archivos y se eliminaron {cantidad_duplicados} registros duplicados encontrados entre las distintas listas.")
+                    st.success(f"🪄 **Limpieza Automática Global:** Se eliminaron {cantidad_duplicados} registros idénticos encontrados entre las distintas listas.")
                 else:
-                    st.success("✅ Archivos fusionados exitosamente. No se detectaron duplicados entre las listas.")
+                    st.success("✅ Archivos fusionados exitosamente.")
+                    
+                # Detección de parciales para pintar
+                dnis_con_datos_final = df_consolidado[df_consolidado['*Nro. Id.'] != '']
+                cant_dup_parciales = dnis_con_datos_final.duplicated(subset=['*Nro. Id.'], keep=False).sum()
+
+                if cant_dup_parciales > 0:
+                    st.warning(f"⚠️ **¡Alerta de revisión!** Quedaron {cant_dup_parciales} registros con el mismo DNI pero distintos nombres entre los archivos. Se pintaron de amarillo para que los analices.")
                 
                 st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
                 st.write("**Vista Previa del Archivo Unificado:**")
-                st.dataframe(df_consolidado)
+                st.dataframe(df_consolidado.style.apply(pintar_duplicados, subset=['*Nro. Id.']))
                 st.markdown('</div>', unsafe_allow_html=True)
                 
                 buffer_unif = io.BytesIO()
@@ -721,7 +724,17 @@ with tab_unificador:
                 with pd.ExcelWriter(buffer_unif, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
                     df_consolidado.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
                     workbook = writer.book
+                    worksheet = writer.sheets['AP - Personas x Grupo']
                     inyectar_listas_desplegables(writer, df_consolidado, workbook, "AP - Personas x Grupo")
+                    
+                    # --- INYECTAR FORMATO CONDICIONAL EN EL EXCEL ---
+                    idx_dni = list(df_consolidado.columns).index('*Nro. Id.')
+                    letra_col_dni = string.ascii_uppercase[idx_dni]
+                    rango_dni = f"{letra_col_dni}2:{letra_col_dni}5000"
+                    formula = f'=AND({letra_col_dni}2<>"", COUNTIF(${letra_col_dni}$2:${letra_col_dni}$5000,{letra_col_dni}2)>1)'
+                    
+                    formato_amarillo = workbook.add_format({'bg_color': '#FFF2CC', 'font_color': '#9C6500'})
+                    worksheet.conditional_format(rango_dni, {'type': 'formula', 'criteria': formula, 'format': formato_amarillo})
                 
                 col_u1, col_u2 = st.columns([1, 1])
                 with col_u1:
