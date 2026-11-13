@@ -95,12 +95,10 @@ def procesar_nombre_compuesto(texto):
     if pd.isna(texto) or texto.lower() == 'nan' or not texto:
         return "", ""
         
-    # 1. Si hay coma, respetamos estrictamente esa separación (Apellido, Nombre)
     if "," in texto:
         partes = texto.split(",", 1)
         return partes[0].strip().upper(), partes[1].strip().upper()
         
-    # 2. Si no hay coma, aplicamos heurística de conectores
     palabras = texto.split()
     if len(palabras) == 1:
         return texto.upper(), ""
@@ -108,13 +106,10 @@ def procesar_nombre_compuesto(texto):
     idx_corte = 1
     primera = palabras[0].upper()
     
-    # Si la primera palabra es un conector típico de apellido
     if primera in ["DE", "DEL", "DI", "SAN", "SANTA", "MAC", "MC", "VAN", "VON", "LA", "LOS", "LAS"]:
-        # Verificamos si es un prefijo de 3 palabras (Ej: "DE LA VEGA")
         if len(palabras) > 2 and primera == "DE" and palabras[1].upper() in ["LA", "LAS", "LOS"]:
             idx_corte = 3
         else:
-            # O si es de 2 palabras (Ej: "DI CARLO")
             idx_corte = 2
             
     apellido = " ".join(palabras[:idx_corte]).upper()
@@ -209,7 +204,15 @@ with tab_armador:
             st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
             st.write("### 📌 Mapeo de Columnas")
             
-            formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido en el Excel original?", ["En una sola columna", "En columnas separadas"], horizontal=True)
+            opciones_formato = ["En una sola columna", "En dos columnas (1 Apellido, 1 Nombre)", "En múltiples columnas (Apellidos y Nombres partidos)"]
+            formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido en el Excel original?", opciones_formato, horizontal=True)
+            
+            # Variables default para todos los casos
+            cols_apellido_multi = []
+            cols_nombre_multi = []
+            col_nombre_completo = "No incluir"
+            col_apellido_sep = "No incluir"
+            col_nombre_sep = "No incluir"
             
             if formato_nombres == "En una sola columna":
                 c1, c2, c3, c4 = st.columns(4)
@@ -217,16 +220,25 @@ with tab_armador:
                 with c2: col_nombre_completo = st.selectbox("Nombre y Apellido juntos:", options=columnas_disponibles)
                 with c3: col_fecha = st.selectbox("Fecha de Nacimiento:", options=columnas_disponibles)
                 with c4: col_id_persona = st.selectbox("ID Persona (Opcional):", options=columnas_disponibles)
-                col_apellido_sep = "No incluir"
-                col_nombre_sep = "No incluir"
-            else:
+            elif formato_nombres == "En dos columnas (1 Apellido, 1 Nombre)":
                 c1, c2, c3, c4, c5 = st.columns(5)
                 with c1: col_dni = st.selectbox("Columna de DNI o CUIL:", options=columnas_disponibles)
                 with c2: col_apellido_sep = st.selectbox("Columna de Apellido:", options=columnas_disponibles)
                 with c3: col_nombre_sep = st.selectbox("Columna de Nombre:", options=columnas_disponibles)
                 with c4: col_fecha = st.selectbox("Fecha Nacimiento:", options=columnas_disponibles)
                 with c5: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles)
-                col_nombre_completo = "No incluir"
+            else:
+                st.info("💡 Podés seleccionar más de una columna haciendo clic en el recuadro. El sistema unirá los textos en el orden que los elijas.")
+                c1, c2, c3 = st.columns(3)
+                columnas_reales = list(df_crudo.columns)
+                with c1:
+                    col_dni = st.selectbox("DNI o CUIL:", options=columnas_disponibles)
+                    col_fecha = st.selectbox("Fecha Nacimiento:", options=columnas_disponibles)
+                    col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles)
+                with c2:
+                    cols_apellido_multi = st.multiselect("Seleccioná las columnas de APELLIDO:", options=columnas_reales)
+                with c3:
+                    cols_nombre_multi = st.multiselect("Seleccioná las columnas de NOMBRE:", options=columnas_reales)
                 
             if st.button("Procesar y Generar Plantilla Oficial"):
                 columnas_oficiales = ['Acción', '*Tipo Id.', '*Nro. Id.', '*Apellido', '*Nombre', '*Fecha de Nacimiento', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
@@ -248,14 +260,14 @@ with tab_armador:
                 if formato_nombres == "En una sola columna":
                     if col_nombre_completo != "No incluir":
                         for nombre_completo in df_crudo[col_nombre_completo]:
-                            # APLICAR EL NUEVO MOTOR INTELIGENTE DE NOMBRES COMPUESTOS
                             ap, nom = procesar_nombre_compuesto(nombre_completo)
                             apellidos.append(ap)
                             nombres.append(nom)
                     else:
                         apellidos = [""] * len(df_crudo)
                         nombres = [""] * len(df_crudo)
-                else: 
+                        
+                elif formato_nombres == "En dos columnas (1 Apellido, 1 Nombre)":
                     if col_apellido_sep != "No incluir":
                         apellidos = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[col_apellido_sep]]
                     else:
@@ -263,6 +275,21 @@ with tab_armador:
                         
                     if col_nombre_sep != "No incluir":
                         nombres = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[col_nombre_sep]]
+                    else:
+                        nombres = [""] * len(df_crudo)
+                        
+                else: # En múltiples columnas
+                    if len(cols_apellido_multi) > 0:
+                        apellidos = df_crudo[cols_apellido_multi].apply(
+                            lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
+                        ).tolist()
+                    else:
+                        apellidos = [""] * len(df_crudo)
+                        
+                    if len(cols_nombre_multi) > 0:
+                        nombres = df_crudo[cols_nombre_multi].apply(
+                            lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
+                        ).tolist()
                     else:
                         nombres = [""] * len(df_crudo)
 
@@ -606,7 +633,15 @@ with tab_unificador:
                             
                             columnas_disponibles = ["No incluir"] + list(df_tmp.columns)
                             
-                            formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido acá?", ["En una sola columna", "En columnas separadas"], horizontal=True, key=f"fmt_nom_unif_{idx_global}")
+                            opciones_formato = ["En una sola columna", "En dos columnas (1 Apellido, 1 Nombre)", "En múltiples columnas (Apellidos y Nombres partidos)"]
+                            formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido acá?", opciones_formato, horizontal=True, key=f"fmt_nom_unif_{idx_global}")
+                            
+                            # Variables default para unificador
+                            cols_apellido_multi = []
+                            cols_nombre_multi = []
+                            col_nombre_completo = "No incluir"
+                            col_apellido_sep = "No incluir"
+                            col_nombre_sep = "No incluir"
                             
                             if formato_nombres == "En una sola columna":
                                 c1, c2, c3, c4 = st.columns(4)
@@ -614,16 +649,24 @@ with tab_unificador:
                                 with c2: col_nombre_completo = st.selectbox("Nombre completo:", options=columnas_disponibles, key=f"nomc_{idx_global}")
                                 with c3: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec1_{idx_global}")
                                 with c4: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id1_{idx_global}")
-                                col_apellido_sep = "No incluir"
-                                col_nombre_sep = "No incluir"
-                            else:
+                            elif formato_nombres == "En dos columnas (1 Apellido, 1 Nombre)":
                                 c1, c2, c3, c4, c5 = st.columns(5)
                                 with c1: col_dni = st.selectbox("DNI/CUIL:", options=columnas_disponibles, key=f"dni2_{idx_global}")
                                 with c2: col_apellido_sep = st.selectbox("Apellido:", options=columnas_disponibles, key=f"ape_{idx_global}")
                                 with c3: col_nombre_sep = st.selectbox("Nombre:", options=columnas_disponibles, key=f"nom_{idx_global}")
                                 with c4: col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec2_{idx_global}")
                                 with c5: col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id2_{idx_global}")
-                                col_nombre_completo = "No incluir"
+                            else:
+                                c1, c2, c3 = st.columns(3)
+                                columnas_reales = list(df_tmp.columns)
+                                with c1:
+                                    col_dni = st.selectbox("DNI o CUIL:", options=columnas_disponibles, key=f"dni3_{idx_global}")
+                                    col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec3_{idx_global}")
+                                    col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id3_{idx_global}")
+                                with c2:
+                                    cols_apellido_multi = st.multiselect("Columnas de APELLIDO:", options=columnas_reales, key=f"apem_{idx_global}")
+                                with c3:
+                                    cols_nombre_multi = st.multiselect("Columnas de NOMBRE:", options=columnas_reales, key=f"nomm_{idx_global}")
                                 
                             configs.append({
                                 'archivo': arch,
@@ -634,6 +677,8 @@ with tab_unificador:
                                 'col_nombre_completo': col_nombre_completo,
                                 'col_apellido_sep': col_apellido_sep,
                                 'col_nombre_sep': col_nombre_sep,
+                                'cols_apellido_multi': cols_apellido_multi,
+                                'cols_nombre_multi': cols_nombre_multi,
                                 'col_fecha': col_fecha,
                                 'col_id_persona': col_id_persona
                             })
@@ -676,14 +721,14 @@ with tab_unificador:
                     if cfg['formato_nombres'] == "En una sola columna":
                         if cfg['col_nombre_completo'] != "No incluir":
                             for nombre_completo in df_crudo[cfg['col_nombre_completo']]:
-                                # APLICAR EL NUEVO MOTOR INTELIGENTE A LA UNIFICACIÓN MULTI-HOJA
                                 ap, nom = procesar_nombre_compuesto(nombre_completo)
                                 apellidos.append(ap)
                                 nombres.append(nom)
                         else:
                             apellidos = [""] * len(df_crudo)
                             nombres = [""] * len(df_crudo)
-                    else:
+                            
+                    elif cfg['formato_nombres'] == "En dos columnas (1 Apellido, 1 Nombre)":
                         if cfg['col_apellido_sep'] != "No incluir":
                             apellidos = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[cfg['col_apellido_sep']]]
                         else:
@@ -691,6 +736,21 @@ with tab_unificador:
                             
                         if cfg['col_nombre_sep'] != "No incluir":
                             nombres = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[cfg['col_nombre_sep']]]
+                        else:
+                            nombres = [""] * len(df_crudo)
+                            
+                    else: # Múltiples columnas
+                        if len(cfg['cols_apellido_multi']) > 0:
+                            apellidos = df_crudo[cfg['cols_apellido_multi']].apply(
+                                lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
+                            ).tolist()
+                        else:
+                            apellidos = [""] * len(df_crudo)
+                            
+                        if len(cfg['cols_nombre_multi']) > 0:
+                            nombres = df_crudo[cfg['cols_nombre_multi']].apply(
+                                lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
+                            ).tolist()
                         else:
                             nombres = [""] * len(df_crudo)
 
