@@ -73,31 +73,54 @@ def procesar_dni_cuil(valor):
     texto = str(valor).strip()
     if texto.lower() == 'nan' or not texto: return ""
     
-    # 1. Si tiene dos guiones o más (ej: 20-31784656-9) se queda con el medio
-    if texto.count('-') >= 2:
+    if '-' in texto:
         partes = texto.split('-')
-        texto = "".join(partes[1:-1])
+        if len(partes) >= 3:
+            texto = "".join(partes[1:-1])
+        elif len(partes) == 2:
+            if len(partes[0]) <= 2:
+                texto = partes[1][:-1]
+            else:
+                texto = partes[0][2:]
         return re.sub(r'[^0-9]', '', texto)
-        
-    # 2. Si tiene un solo guion
-    elif texto.count('-') == 1:
-        partes = texto.split('-')
-        if len(partes[0]) <= 2:
-            # Guion al inicio (ej: 20-317846569). Saca prefijo y último dígito.
-            texto = partes[1][:-1]
-        else:
-            # Guion al final (ej: 2031784656-9). Saca sufijo y los dos primeros dígitos.
-            texto = partes[0][2:]
-        return re.sub(r'[^0-9]', '', texto)
-        
-    # 3. Si no tiene guiones (todo pegado o con puntos)
     else:
         numeros = re.sub(r'[^0-9]', '', texto)
-        # Si tiene 10 u 11 digitos, asumimos que es CUIL pegado y sacamos las puntas
         if len(numeros) >= 10:
             return numeros[2:-1]
-        # Si tiene 8 o menos, es DNI directo
         return numeros
+
+def procesar_nombre_compuesto(texto):
+    """Separa inteligentemente un nombre completo en Apellido y Nombre, detectando prefijos compuestos."""
+    texto = str(texto).strip()
+    if pd.isna(texto) or texto.lower() == 'nan' or not texto:
+        return "", ""
+        
+    # 1. Si hay coma, respetamos estrictamente esa separación (Apellido, Nombre)
+    if "," in texto:
+        partes = texto.split(",", 1)
+        return partes[0].strip().upper(), partes[1].strip().upper()
+        
+    # 2. Si no hay coma, aplicamos heurística de conectores
+    palabras = texto.split()
+    if len(palabras) == 1:
+        return texto.upper(), ""
+        
+    idx_corte = 1
+    primera = palabras[0].upper()
+    
+    # Si la primera palabra es un conector típico de apellido
+    if primera in ["DE", "DEL", "DI", "SAN", "SANTA", "MAC", "MC", "VAN", "VON", "LA", "LOS", "LAS"]:
+        # Verificamos si es un prefijo de 3 palabras (Ej: "DE LA VEGA")
+        if len(palabras) > 2 and primera == "DE" and palabras[1].upper() in ["LA", "LAS", "LOS"]:
+            idx_corte = 3
+        else:
+            # O si es de 2 palabras (Ej: "DI CARLO")
+            idx_corte = 2
+            
+    apellido = " ".join(palabras[:idx_corte]).upper()
+    nombre = " ".join(palabras[idx_corte:]).upper()
+    
+    return apellido, nombre
 
 def pintar_duplicados(s):
     """Función para colorear de amarillo las celdas duplicadas en la vista web."""
@@ -225,22 +248,10 @@ with tab_armador:
                 if formato_nombres == "En una sola columna":
                     if col_nombre_completo != "No incluir":
                         for nombre_completo in df_crudo[col_nombre_completo]:
-                            texto = str(nombre_completo).strip()
-                            if texto.lower() == 'nan' or pd.isna(nombre_completo) or not texto:
-                                apellidos.append("")
-                                nombres.append("")
-                            elif "," in texto:
-                                partes = texto.split(",", 1)
-                                apellidos.append(partes[0].strip().upper())
-                                nombres.append(partes[1].strip().upper())
-                            else:
-                                partes = texto.split(" ", 1)
-                                if len(partes) > 1:
-                                    apellidos.append(partes[0].strip().upper())
-                                    nombres.append(partes[1].strip().upper())
-                                else:
-                                    apellidos.append(texto.upper())
-                                    nombres.append("")
+                            # APLICAR EL NUEVO MOTOR INTELIGENTE DE NOMBRES COMPUESTOS
+                            ap, nom = procesar_nombre_compuesto(nombre_completo)
+                            apellidos.append(ap)
+                            nombres.append(nom)
                     else:
                         apellidos = [""] * len(df_crudo)
                         nombres = [""] * len(df_crudo)
@@ -665,22 +676,10 @@ with tab_unificador:
                     if cfg['formato_nombres'] == "En una sola columna":
                         if cfg['col_nombre_completo'] != "No incluir":
                             for nombre_completo in df_crudo[cfg['col_nombre_completo']]:
-                                texto = str(nombre_completo).strip()
-                                if texto.lower() == 'nan' or pd.isna(nombre_completo) or not texto:
-                                    apellidos.append("")
-                                    nombres.append("")
-                                elif "," in texto:
-                                    partes = texto.split(",", 1)
-                                    apellidos.append(partes[0].strip().upper())
-                                    nombres.append(partes[1].strip().upper())
-                                else:
-                                    partes = texto.split(" ", 1)
-                                    if len(partes) > 1:
-                                        apellidos.append(partes[0].strip().upper())
-                                        nombres.append(partes[1].strip().upper())
-                                    else:
-                                        apellidos.append(texto.upper())
-                                        nombres.append("")
+                                # APLICAR EL NUEVO MOTOR INTELIGENTE A LA UNIFICACIÓN MULTI-HOJA
+                                ap, nom = procesar_nombre_compuesto(nombre_completo)
+                                apellidos.append(ap)
+                                nombres.append(nom)
                         else:
                             apellidos = [""] * len(df_crudo)
                             nombres = [""] * len(df_crudo)
