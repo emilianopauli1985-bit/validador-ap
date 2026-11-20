@@ -7,8 +7,8 @@ import re
 import string
 import os
 
-# Configuración inicial de la página (¡Corregido!)
-st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
+# Configuración inicial de la página (Fuerza el cierre de la barra lateral fantasma)
+st.set_page_config(page_title="Asistente Operativo - AP", layout="wide", initial_sidebar_state="collapsed")
 
 # =========================================================
 # VARIABLES DE MEMORIA (Para limpiar archivos y Chatbot)
@@ -174,6 +174,14 @@ st.markdown(
     }
     div[data-baseweb="tab-highlight"] { background-color: #FFFFFF !important; }
     div[data-baseweb="tab-border"] { display: none !important; background-color: transparent !important; }
+    
+    /* ELIMINAR LA BARRA LATERAL FANTASMA POR COMPLETO */
+    [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+    section[data-testid="stSidebar"] {
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -1147,6 +1155,14 @@ div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testi
 /* 5. Cajas de input más limpias adentro del popover */
 div[data-testid="stPopoverBody"] div[data-baseweb="input"] {
     border-radius: 20px;
+}
+/* --- SOLUCIÓN AL ESPACIO FANTASMA --- */
+/* Ocultar el menú lateral por completo para recuperar el ancho de pantalla */
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+section[data-testid="stSidebar"] {
+    display: none !important;
 }
 </style>
 """, unsafe_allow_html=True)
