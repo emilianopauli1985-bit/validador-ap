@@ -8,10 +8,10 @@ import string
 import os
 
 # Configuración inicial de la página
-st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
+st.set_page_config(page_title="Asistente Operativo - AP", layout="wide", initial_sidebar_state="expanded")
 
 # =========================================================
-# VARIABLES DE MEMORIA (Para limpiar los archivos subidos)
+# VARIABLES DE MEMORIA (Para limpiar archivos y Chatbot)
 # =========================================================
 if 'reset_armador' not in st.session_state:
     st.session_state.reset_armador = 0
@@ -22,6 +22,18 @@ if 'reset_unificador' not in st.session_state:
 if 'reset_pdf' not in st.session_state:
     st.session_state.reset_pdf = 0
 
+# --- Memoria del Chatbot de Reglas ---
+if "chat_history" not in st.session_state:
+    mensaje_bienvenida = (
+        "¡Hola! 👋 Soy tu Asistente Operativo. ¿En qué te puedo ayudar hoy?\n\n"
+        "Escribí el **número** de la opción que necesites:\n"
+        "**1** - 📄 Cotizaciones\n"
+        "**2** - 📝 Formularios\n"
+        "**3** - 📞 Contactar un operador"
+    )
+    st.session_state.chat_history = [{"role": "assistant", "content": mensaje_bienvenida, "file": None}]
+    st.session_state.chat_step = 0 # 0: Inicio, 1: Cotizaciones, 2: Formularios, 3: Contacto, 4: Suscriptores
+
 # =========================================================
 # LISTAS DESPLEGABLES EXTRAÍDAS DE LA PLANTILLA OFICIAL
 # =========================================================
@@ -29,7 +41,7 @@ LISTAS_DESPLEGABLES = {
     'Acción': ['Agregar', 'Eliminar', 'Actualizar'],
     '*Tipo Id.': ['D.N.I.', 'Pasaporte'],
     '*Incapacidad': ['SI', 'NO'],
-    '*Ocupación': ['Administración del hogar. Ama de casa.-4111', 'Administrativos-1112', 'Agricultores, productores y peones de cultivos mixtos y ganaderos-6114', 'Agricultores, productores y trabajadores de cultivos (Agropecuarios, alambradores)-6111', 'Agricultores, productores y trabajadores de plantaciones de frutales, huertas, invernaderos y viveros-6113', 'Agricultores, productores y trabajadores de plantaciones de árboles y arbustos. Trabajadores forestales. (desmonte, hacheros)-6112', 'Alfareros y afines. Barro, arcilla, abrasivos.-8113', 'Alumnos de escuelas, colegios y/o complejos educativos-9111', 'Aon 1-9995', 'Aon 2-9996', 'Aon 3-9997', 'Aon 4-9998', 'Apicultores-6117', 'Artesanos de los tejidos, el cuero y materiales similares (tapiceros)-8116', 'Artesanos en madera, cestería y materiales similares-8115', 'Avicultores-6116', 'Barnizadores, lustradores y afines-7219', 'Bomberos y rescatistas-4135', 'Carboneros de carbón vegetal y afines-6121', 'Colonias de vacaciones-9112', 'Comerciantes al por mayor de bebidas y/o tabacos. Fraccionamiento, carga y descarga, transporte/distribución y venta.-5112', 'Comerciantes al por mayor de madera, papel y derivados y/o materiales para la construcción. Carga y descarga, transporte/distribución y venta.-5114', 'Comerciantes al por mayor de productos alimentarios. Acopio, carga y descarga, distribución/transporte, fraccionamiento, abastecimiento y venta.-5111', 'Comerciantes al por mayor de textiles, prendas de vestir y cuero. Distribución y venta.-5113', 'Comercios al por mayor de motores, máquinas, equipos industriales, comerciales y domésticos. Distribución y venta.-5115', 'Comisionistas y/o cobradores-2116', 'Conductores de autobuses y/o ambulancias-3113', 'Conductores de automóviles, taxis y/o camionetas (remisero, taxista)-3112', 'Conductores de motocicletas y/o bicicletas (Delivery, cadete, repartidor)-3111', 'Conductores y/o acompañantes de camiones-3114', 'Conservación de redes de agua-7612', 'Conservación de redes de gas-7611', 'Constructores y/o demoledores de edificios y/o excavadores (Construcción, zanjeo, albañiles)-7111', 'Criadores de especies acuáticas-6122', 'Criadores de ganado y trabajadores pecuarios. Tamberos. (esquiladores, cuidadores de caballos)-6115', 'Criadores y trabajadores de la cría de animales diversos y de granja-6118', 'Cristaleros. Espejos, vidrios y afines (vidrieros)-7213', 'Cuidadores y adiestradores animales domésticos-4112', 'Deportistas en la práctica de Fútbol-9138', 'Deportistas en la práctica de Hockey-9139', 'Deportistas en la práctica de artes marciales, boxeo, rugby-9144', 'Deportistas en la práctica de básquet, handball, mountain bike, airsoft, arquería-9140', 'Deportistas en la práctica de canotaje, kayak, stand up paddle, Windsurf, Kite, rapel, escalada, esquí, pesca deportiva, equitación, cabalgata-9116', 'Deportistas en la práctica de doma, jinete, jockey, pato, hipismo, sortija-9143', 'Deportistas en la práctica de fútbol, básquet, hockey, handball.-9115', 'Deportistas en la práctica de golf, paddle,  squash, tenis, voleyball, natación en piscinas, ciclismo, atletismo, gimnasia deportiva, esgrima, patinaje, newcom, trekking sin altura, running, maratón-9114', 'Directores y gerentes (Consejeros, Presidente comisión directiva)-1111', 'Electricistas (Instalación domiciliaria e industrial, alarmas)-7511', 'Empleadores / Directivos-9131', 'Empleadores / Oficios-9132', 'En tránsito vehicular-9123', 'En tránsito vehicular-9124', 'Especialistas en operaciones comerciales. Recibidores, rematadores, despachantes de aduana y Agente marítimo-2115', 'Especialistas en operaciones financieras y de administración de empresas. Contadores, productores de seguros, tasadores, agentes de bolsa y cambio. (Actuarios, administrador de propiedades, gestores, peritos)-2114', 'Expendio de combustibles. Estaciones de servicio.-5233', 'Fotógrafos (camarógrafos)-4117', 'Fumigadores terrestres-6123', 'Fumigadores, desinfecciones y otros controladores de plagas domiciliarias-4113', 'Herreros, torneros y forjadores-7311', 'Impresores y/o estampadores y operadores de máquinas de imprenta (Imprenta y litografía)-8118', 'Instaladores de material aislante (Impermeabilización de techos)-7212', 'Instaladores y reparadores de líneas eléctricas-7514', 'Instaladores y reparadores de líneas telefónicas, de tecnología de la información y comunicaciones-7516', 'Jardineros y pileteros (casas particulares)-9135', 'Joyeros, orfebres y plateros-8112', 'Lavadores y/o engrasadores de vehículos.-4114', 'Lavanderos, planchadores, tintoreros-4115', 'Limpiadores de oficinas, hoteles y otros establecimientos-4116', 'Marineros de embarcaciones de paseo-3118', 'Mecánicos montadores de instalaciones de refrigeración y climatización (Reparación de aires acondicionados en vehículos)-7215', 'Mecánicos y reparadores de máquinas agrícolas e industriales-7412', 'Mecánicos y reparadores de vehículos de motor (Taller mecánico, chapa y pintura)-7411', 'Mecánicos y reparadores en electrónica (Técnico electrónico, electromecánico, service de máquinas)-7515', 'Montadores industriales de estructuras metálicas, antenas, maquinarias. (Antenista, ascensores, installation de máquinas frigoríficas, aire acondicionado, armado de silos y/o norias, molinos, zinguería, cartelería, toldos, carpas)-7312', 'Operadores de grúas, de aparatos elevadores y afines-3117', 'Operadores de instalaciones electrónicas, tableros y/o consolas en la industria-7712', 'Operadores de instalaciones y de máquinas en la industria (operarios de fábrica, frigoríficos, metalúrgicos, fabricación de alimentos, carpintería, clasificador de cereal, aserradero, marmolería)-7711', 'Operadores de maquinaria agrícola y forestal motorizada (cosechadoras, tractores, cargadores frontales, equipos de forraje, sembradoras, desmalezadoras, pulverizadoras, motosierra, excavadora)-3115', 'Operadores de máquinas de movimiento de tierras y afines (Grúas, máquinas viales)-3116', 'Parqueteros y colocadores de suelos (Colocación y pulidores de pisos, alfombras y similares)-7211', 'Pasantías Escolares (tareas ADMINISTRATIVAS)-9136', 'Pasantías Escolares (tareas OFICIOS / TÉCNICOS)-9137', 'Peones de carga y descarga (reparto de gas domiciliario, mudanzas, embaladores, estibadores, reparto frigorífico)-4118', 'Peones de obras públicas y mantenimiento: carreteras, presas y obras similares-7113', 'Personal de pompas fúnebres y embalsamadores-4119', 'Pintores y empapeladores (Limpiadores de vidrios, colocación cielorraso)-7216', 'Plomeros y gasistas (instaladores de tuberías de agua y gas)-7214', 'Porteros, conserjes, ordenanzas, encargados de garages y afines-4120', 'Profesionales de la enseñanza maestros, profesores, docentes y de las ciencias de la información/bibliotecarios-2113', 'Profesionales de la salud. Médicos, enfermeras, paramédicos. (Instrumentista, odontólogo, mecánico dental, radiólogo, oftalmólogo, kinesiologo, fisioterapeuta, fonoudiología, anestesista, camillero)-2112', 'Profesionales de las actividades deportivas. Instructores de educación física, entrenadores, guías de turismo, árbitros o similares.-2121', 'Profesionales de las artes y la cultura. Periodistas, traductores, escritores, locutores, músicos, artistas, actores, diseñadores.-2120', 'Profesionales de las ciencias sociales. Psicólogos, sociólogos, religiosos, Acompañante terapéutico, psicopedagoga.-2119', 'Profesionales de las ciencias y de la ingeniería. Ingenieros,  arquitectos, técnicos, bioquímicos, químicos, biólogos, físicos, geólogos (supervisor, inspectores, laboratorio, topografos y geografos, enologos, agrimensores)-2111', 'Profesionales de tecnología de la información y las comunicaciones, Desarrolladores y analistas de software, administradores de bases de datos, técnicos.-2117', 'Profesionales del derecho. Abogados, jueces o similares, escribanos, procuradores.-2118', 'Pulidores de metales y afiladores de herramientas-7314', 'Reparadores de instrumentos de precisión-8111', 'Sastres, modistos, costureros, bordadores, peleteros, sombrereros y afines-8211', 'Senderismo / Trekking Ushuaia (Residentes)-9141', 'Senderismo / Trekking Ushuaia (Turistas)-9142', 'Servicio Dom. Casas Familia M.V.-9126', 'Servicios de belleza, higiene y estética corporal (Manicura, masajista, pedicuro, peluquero, coiffeur)-4121', 'Servicios de comida y hospedaje prestados en hoteles y similares. Mucamas y cocineros.-4134', 'Servicios de comidas y bebidas prestados en eventos y similares.-4133', 'Servicios de comidas y bebidas prestados en restaurantes, bares y cafés. (cocinero, chef, mozo, barman, catering)-4132', 'Servicios de correo-4136', 'Servicios de diversión y esparcimiento en salones de baile, discotecas, salones de juegos electrónicos, billar y similares. (DJ, sonidista y armado de equipos, iluminación, decoradores de eventos)-4122', 'Servicios de jardinería y horticultura, poda, desmalezamiento y afines-4123', 'Servicios de mantenimiento general de instalaciones en establecimientos o instituciones-4124', 'Servicios de promociones y/o modelaje publicitario o artístico (promotores, modelos, encuestadores, personal en stands)-4125', 'Servicios de protección (bañeros o guardavidas en clubes o instituciones)-4126', 'Servicios de reparación de artículos personales, de los hogares y cerrajeros-4127', 'Servicios de saneamiento y similares. Recolección de residuos, limpieza, desagote de pozos (limpieza tanques de agua)-4128', 'Servicios de seguridad y vigilancia. Serenos, vigilantes, guardaparques y afines. (casero, personal de guardia)-4129', 'Servicios domésticos, cuidadores de niños, cuidadores personales, mucamas-4130', 'Servicios prestados por municipalidades o comunas-4131', 'Soldadores y oxicortadores-7315', 'Sopladores, moldeadores, laminadores, cortadores y pulidores de vidrios-8114', 'Tapiceros, colchoneros y afines-8213', 'Tareas varias por M.V.-9125', 'Transportistas-9130', 'Vendedores de aparatos fotográficos, artículos de fotografía e instrumentos de óptica.-5241', 'Vendedores de armas y cuchillería.-5226', 'Vendedores de artefactos eléctricos para iluminación.-5238', 'Vendedores de artículos de bazar y menaje. Bazares.-5235', 'Vendedores de artículos de juguetería y cotillón. Jugueterías.-5224', 'Vendedores de artículos de librería, papelería y oficina. Librerías y papelerías.-5225', 'Vendedores de artículos de tocador y cosméticos. Perfumerías.-5229', 'Vendedores de artículos para el hogar. Heladeras, lavarropas, televisores, etc.-5237', 'Vendedores de aves y huevos, animales de corral y caza y otros productos de granja.-5213', 'Vendedores de billetes de lotería y otros juegos de azar. Agencias de lotería.-5219', 'Vendedores de calzado y artículos de cuero. Zapaterías. Zapatillerías. Marroquinerías.-5221', 'Vendedores de carne y derivados. Carnicerías-5212', 'Vendedores de cámaras y cubiertas. Gomerías.-5234', 'Vendedores de flores y plantas. Distribución y venta.-5116', 'Vendedores de friambres y comidas preparadas. Rotiserías y fiambrerias.-5215', 'Vendedores de instrumentos musicales y/o discos. Disquerías. (playeros)-5223', 'Vendedores de muebles. Mueblerías.-5222', 'Vendedores de pan y demás productos de panadería. Panaderías, confiterías y/o fábrica de pastas frescas. (venta, producción, elaboración de pan y pastas)-5217', 'Vendedores de pescados y otros productos marinos, fluviales y lacustres. Pescaderías.-5214', 'Vendedores de pinturas, barnices, esmaltes, artículos de ferretería. Ferreterías y pinturerías.-5228', 'Vendedores de prendas de vestir y/o productos textiles.-5220', 'Vendedores de productos en almacenes, supermercados o autoservicios. (Repositores, cajeros).-5211', 'Vendedores de productos farmacéuticos y medicinales. Farmacias.-5227', 'Vendedores de productos medicinales para animales. Veterinarias.-5230', 'Vendedores de repuestos y accesorios para automotores.-5240', 'Vendedores de sanitarios.-5236', 'Vendedores de semillas, abonos y plaguicidas.-5231', 'Vendedores de tabaco, cigarrillos, golosinas.-5218', 'Vendedores de vehículos automotores.-5239', 'Vendedores de verduras, frutas y hortalizas frescas. Verdulerías y fruterías.-5216', 'Veterinarios de animales domésticos-2123', 'Veterinarios y vacunadores rurales-2122', 'Viajeros, excursionistas, campamentistas, turistas-9113', 'Viajes Fuera Territorio Nacional (Exterior)-9120', 'Viajes Territorio Nacional-9119', 'Vitivinicultores y/u olivicultores-6120', 'Yeseros-7218', 'Zapateros y afines-8214'],
+    '*Ocupación': ['Administración del hogar. Ama de casa.-4111', 'Administrativos-1112', 'Agricultores, productores y peones de cultivos mixtos y ganaderos-6114', 'Agricultores, productores y trabajadores de cultivos (Agropecuarios, alambradores)-6111', 'Agricultores, productores y trabajadores de plantaciones de frutales, huertas, invernaderos y viveros-6113', 'Agricultores, productores y trabajadores de plantaciones de árboles y arbustos. Trabajadores forestales. (desmonte, hacheros)-6112', 'Alfareros y afines. Barro, arcilla, abrasivos.-8113', 'Alumnos de escuelas, colegios y/o complejos educativos-9111', 'Aon 1-9995', 'Aon 2-9996', 'Aon 3-9997', 'Aon 4-9998', 'Apicultores-6117', 'Artesanos de los tejidos, el cuero y materiales similares (tapiceros)-8116', 'Artesanos en madera, cestería y materiales similares-8115', 'Avicultores-6116', 'Barnizadores, lustradores y afines-7219', 'Bomberos y rescatistas-4135', 'Carboneros de carbón vegetal y afines-6121', 'Colonias de vacaciones-9112', 'Comerciantes al por mayor de bebidas y/o tabacos. Fraccionamiento, carga y descarga, transporte/distribución y venta.-5112', 'Comerciantes al por mayor de madera, papel y derivados y/o materiales para la construcción. Carga y descarga, transporte/distribución y venta.-5114', 'Comerciantes al por mayor de productos alimentarios. Acopio, carga y descarga, distribución/transporte, fraccionamiento, abastecimiento y venta.-5111', 'Comerciantes al por mayor de textiles, prendas de vestir y cuero. Distribución y venta.-5113', 'Comercios al por mayor de motores, máquinas, equipos industriales, comerciales y domésticos. Distribución y venta.-5115', 'Comisionistas y/o cobradores-2116', 'Conductores de autobuses y/o ambulancias-3113', 'Conductores de automóviles, taxis y/o camionetas (remisero, taxista)-3112', 'Conductores de motocicletas y/o bicicletas (Delivery, cadete, repartidor)-3111', 'Conductores y/o acompañantes de camiones-3114', 'Conservación de redes de agua-7612', 'Conservación de redes de gas-7611', 'Constructores y/o demoledores de edificios y/o excavadores (Construcción, zanjeo, albañiles)-7111', 'Criadores de especies acuáticas-6122', 'Criadores de ganado y trabajadores pecuarios. Tamberos. (esquiladores, cuidadores de caballos)-6115', 'Criadores y trabajadores de la cría de animales diversos y de granja-6118', 'Cristaleros. Espejos, vidrios y afines (vidrieros)-7213', 'Cuidadores y adiestradores animales domésticos-4112', 'Deportistas en la práctica de Fútbol-9138', 'Deportistas en la práctica de Hockey-9139', 'Deportistas en la práctica de artes marciales, boxeo, rugby-9144', 'Deportistas en la práctica de básquet, handball, mountain bike, airsoft, arquería-9140', 'Deportistas en la práctica de canotaje, kayak, stand up paddle, Windsurf, Kite, rapel, escalada, esquí, pesca deportiva, equitación, cabalgata-9116', 'Deportistas en la práctica de doma, jinete, jockey, pato, hipismo, sortija-9143', 'Deportistas en la práctica de fútbol, básquet, hockey, handball.-9115', 'Deportistas en la práctica de golf, paddle,  squash, tenis, voleyball, natación en piscinas, ciclismo, atletismo, gimnasia deportiva, esgrima, patinaje, newcom, trekking sin altura, running, maratón-9114', 'Directores y gerentes (Consejeros, Presidente comisión directiva)-1111', 'Electricistas (Instalación domiciliaria e industrial, alarmas)-7511', 'Empleadores / Directivos-9131', 'Empleadores / Oficios-9132', 'En tránsito vehicular-9123', 'En tránsito vehicular-9124', 'Especialistas en operaciones comerciales. Recibidores, rematadores, despachantes de aduana y Agente marítimo-2115', 'Especialistas en operaciones financieras y de administración de empresas. Contadores, productores de seguros, tasadores, agentes de bolsa y cambio. (Actuarios, administrador de propiedades, gestores, peritos)-2114', 'Expendio de combustibles. Estaciones de servicio.-5233', 'Fotógrafos (camarógrafos)-4117', 'Fumigadores terrestres-6123', 'Fumigadores, desinfecciones y otros controladores de plagas domiciliarias-4113', 'Herreros, torneros y forjadores-7311', 'Impresores y/o estampadores y operadores de máquinas de imprenta (Imprenta y litografía)-8118', 'Instaladores de material aislante (Impermeabilización de techos)-7212', 'Instaladores y reparadores de líneas eléctricas-7514', 'Instaladores y reparadores de líneas telefónicas, de tecnología de la información y comunicaciones-7516', 'Jardineros y pileteros (casas particulares)-9135', 'Joyeros, orfebres y plateros-8112', 'Lavadores y/o engrasadores de vehículos.-4114', 'Lavanderos, planchadores, tintoreros-4115', 'Limpiadores de oficinas, hoteles y otros establecimientos-4116', 'Marineros de embarcaciones de paseo-3118', 'Mecánicos montadores de instalaciones de refrigeración y climatización (Reparación de aires acondicionados en vehículos)-7215', 'Mecánicos y reparadores de máquinas agrícolas e industriales-7412', 'Mecánicos y reparadores de vehículos de motor (Taller mecánico, chapa y pintura)-7411', 'Mecánicos y reparadores en electrónica (Técnico electrónico, electromecánico, service de máquinas)-7515', 'Montadores industriales de estructuras metálicas, antenas, maquinarias. (Antenista, ascensores, installation de máquinas frigoríficas, aire acondicionado, armado de silos y/o norias, molinos, zinguería, cartelería, toldos, carpas)-7312', 'Operadores de grúas, de aparatos elevadores y afines-3117', 'Operadores de instalaciones electrónicas, tableros y/o consolas en la industria-7712', 'Operadores de instalaciones y de máquinas en la industria (operarios de fábrica, frigoríficos, metalúrgicos, fabricación de alimentos, carpintería, clasificador de cereal, aserradero, marmolería)-7711', 'Operadores de maquinaria agrícola y forestal motorizada (cosechadoras, tractores, cargadores frontales, equipos de forraje, sembradoras, desmalezadoras, pulverizadoras, motosierra, excavadora)-3115', 'Operadores de máquinas de movimiento de tierras y afines (Grúas, máquinas viales)-3116', 'Parqueteros y colocadores de suelos (Colocación y pulidores de pisos, alfombras y similares)-7211', 'Pasantías Escolares (tareas ADMINISTRATIVAS)-9136', 'Pasantías Escolares (tareas OFICIOS / TÉCNICOS)-9137', 'Peones de carga y descarga (reparto de gas domiciliario, mudanzas, embaladores, estibadores, reparto frigorífico)-4118', 'Peones de obras públicas y mantenimiento: carreteras, presas y obras similares-7113', 'Personal de pompas fúnebres y embalsamadores-4119', 'Pintores y empapeladores (Limpiadores de vidrios, colocación cielorraso)-7216', 'Plomeros y gasistas (instaladores de tuberías de agua y gas)-7214', 'Porteros, conserjes, ordenanzas, encargados de garages y afines-4120', 'Profesionales de la enseñanza maestros, profesores, docentes y de las ciencias de la información/bibliotecarios-2113', 'Profesionales de la salud. Médicos, enfermeras, paramédicos. (Instrumentista, odontólogo, mecánico dental, radiólogo, oftalmólogo, kinesiologo, fisioterapeuta, fonoudiología, anestesista, camillero)-2112', 'Profesionales de las actividades deportivas. Instructores de educación física, entrenadores, guías de turismo, árbitros o similares.-2121', 'Profesionales de las arts y la cultura. Periodistas, traductores, escritores, locutores, músicos, artistas, actores, diseñadores.-2120', 'Profesionales de las ciencias sociales. Psicólogos, sociólogos, religiosos, Acompañante terapéutico, psicopedagoga.-2119', 'Profesionales de las ciencias y de la ingeniería. Ingenieros,  arquitectos, técnicos, bioquímicos, químicos, biólogos, físicos, geólogos (supervisor, inspectores, laboratorio, topografos y geografos, enologos, agrimensores)-2111', 'Profesionales de tecnología de la información y las comunicaciones, Desarrolladores y analistas de software, administradores de bases de datos, técnicos.-2117', 'Profesionales del derecho. Abogados, jueces o similares, escribanos, procuradores.-2118', 'Pulidores de metales y afiladores de herramientas-7314', 'Reparadores de instrumentos de precisión-8111', 'Sastres, modistos, costureros, bordadores, peleteros, sombrereros y afines-8211', 'Senderismo / Trekking Ushuaia (Residentes)-9141', 'Senderismo / Trekking Ushuaia (Turistas)-9142', 'Servicio Dom. Casas Familia M.V.-9126', 'Servicios de belleza, higiene y estética corporal (Manicura, masajista, pedicuro, peluquero, coiffeur)-4121', 'Servicios de comida y hospedaje prestados en hoteles y similares. Mucamas y cocineros.-4134', 'Servicios de comidas y bebidas prestados en eventos y similares.-4133', 'Servicios de comidas y bebidas prestados en restaurantes, bares y cafés. (cocinero, chef, mozo, barman, catering)-4132', 'Servicios de correo-4136', 'Servicios de diversión y esparcimiento en salones de baile, discotecas, salones de juegos electrónicos, billar y similares. (DJ, sonidista y armado de equipos, iluminación, decoradores de eventos)-4122', 'Servicios de jardinería y horticultura, poda, desmalezamiento y afines-4123', 'Servicios de mantenimiento general de instalaciones en establecimientos o instituciones-4124', 'Servicios de promociones y/o modelaje publicitario o artístico (promotores, modelos, encuestadores, personal en stands)-4125', 'Servicios de protección (bañeros o guardavidas en clubes o instituciones)-4126', 'Servicios de reparación de artículos personales, de los hogares y cerrajeros-4127', 'Servicios de saneamiento y similares. Recolección de residuos, limpieza, desagote de pozos (limpieza tanques de agua)-4128', 'Servicios de seguridad y vigilancia. Serenos, vigilantes, guardaparques y afines. (casero, personal de guardia)-4129', 'Servicios domésticos, cuidadores de niños, cuidadores personales, mucamas-4130', 'Servicios prestados por municipalidades o comunas-4131', 'Soldadores y oxicortadores-7315', 'Sopladores, moldeadores, laminadores, cortadores y pulidores de vidrios-8114', 'Tapiceros, colchoneros y afines-8213', 'Tareas varias por M.V.-9125', 'Transportistas-9130', 'Vendedores de aparatos fotográficos, artículos de fotografía e instrumentos de óptica.-5241', 'Vendedores de armas y cuchillería.-5226', 'Vendedores de artefactos eléctricos para iluminación.-5238', 'Vendedores de artículos de bazar y menaje. Bazares.-5235', 'Vendedores de artículos de juguetería y cotillón. Jugueterías.-5224', 'Vendedores de artículos de librería, papelería y oficina. Librerías y papelerías.-5225', 'Vendedores de artículos de tocador y cosméticos. Perfumerías.-5229', 'Vendedores de artículos para el hogar. Heladeras, lavarropas, televisores, etc.-5237', 'Vendedores de aves y huevos, animales de corral y caza y otros productos de granja.-5213', 'Vendedores de billetes de lotería y otros juegos de azar. Agencias de lotería.-5219', 'Vendedores de calzado y artículos de cuero. Zapaterías. Zapatillerías. Marroquinerías.-5221', 'Vendedores de carne y derivados. Carnicerías-5212', 'Vendedores de cámaras y cubiertas. Gomerías.-5234', 'Vendedores de flores y plantas. Distribución y venta.-5116', 'Vendedores de friambres y comidas preparadas. Rotiserías y fiambrerias.-5215', 'Vendedores de instrumentos musicales y/o discos. Disquerías. (playeros)-5223', 'Vendedores de muebles. Mueblerías.-5222', 'Vendedores de pan y demás productos de panadería. Panaderías, confiterías y/o fábrica de pastas frescas. (venta, producción, elaboración de pan y pastas)-5217', 'Vendedores de pescados y otros productos marinos, fluviales y lacustres. Pescaderías.-5214', 'Vendedores de pinturas, barnices, esmaltes, artículos de ferretería. Ferreterías y pinturerías.-5228', 'Vendedores de prendas de vestir y/o productos textiles.-5220', 'Vendedores de productos en almacenes, supermercados o autoservicios. (Repositores, cajeros).-5211', 'Vendedores de productos farmacéuticos y medicinales. Farmacias.-5227', 'Vendedores de productos medicinales para animales. Veterinarias.-5230', 'Vendedores de repuestos y accesorios para automotores.-5240', 'Vendedores de sanitarios.-5236', 'Vendedores de semillas, abonos y plaguicidas.-5231', 'Vendedores de tabaco, cigarrillos, golosinas.-5218', 'Vendedores de vehículos automotores.-5239', 'Vendedores de verduras, frutas y hortalizas frescas. Verdulerías y fruterías.-5216', 'Veterinarios de animales domésticos-2123', 'Veterinarios y vacunadores rurales-2122', 'Viajeros, excursionistas, campamentistas, turistas-9113', 'Viajes Fuera Territorio Nacional (Exterior)-9120', 'Viajes Territorio Nacional-9119', 'Vitivinicultores y/u olivicultores-6120', 'Yeseros-7218', 'Zapateros y afines-8214'],
     '*Nacionalidad': ['Afganistan ', 'Albania', 'Alemania', 'Andorra', 'Angola', 'Anguila', 'Antartida', 'Antigua y Barbuda', 'Antillas Holandesas', 'Arabia Saudita', 'Argelia', 'Argentina', 'Armenia', 'Aruba', 'Australia', 'Austria', 'Azerbaiyan', 'Bahamas', 'Bahrein', 'Banglades', 'Barbados', 'Belgica', 'Belice', 'Benin', 'Bermudas', 'Bielorrusia', 'Bolivia', 'Bosnia y Herzegovina', 'Botsuana', 'Brasil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Butan', 'Cabo Verde', 'Camboya', 'Camerun', 'Canada', 'Catar', 'Chad', 'Chile', 'China', 'Chipre', 'Colombia', 'Comoras', 'Congo', 'Corea del Norte', 'Costa de Marfil', 'Costa Rica', 'Croacia', 'Cuba', 'Curazao', 'Dinamarca', 'Dominica', 'Ecuador', 'Edos. Federados de Micronesia', 'Egipto', 'El Salvador', 'Emiratos Arabes Unidos', 'Eritrea', 'Escocia', 'Eslovaquia', 'España', 'Estados Unidos de America', 'Estonia', 'Etiopia', 'Finlandia', 'Fiyi', 'Francia', 'Gabon', 'Gales', 'Gambia', 'Georgia', 'Ghana', 'Gibraltar', 'Granada', 'Grecia', 'Groenlandia', 'Guadalupe', 'Guam', 'Guatemala', 'Guayana Francesa', 'Guernsey', 'Guinea', 'Guinea Bissau', 'Guinea Ecuatorial', 'Guyana', 'Haiti', 'Hawai', 'Honduras', 'Hong Kong', 'Hungria', 'Inglaterra', 'Irak', 'Iran', 'Irlanda del Norte', 'Is. Georgia y Sandwich del Sur', 'Isla Ascension', 'Isla Bouvet', 'Isla de Man', 'Isla Navidad', 'Isla Norfolk', 'Isla Pitcairn', 'Islandia', 'Islas Caiman', 'Islas Cocos', 'Islas Cook', 'Islas Feroe', 'Islas Heard y McDonald', 'Islas Malvinas', 'Islas Marshall', 'Islas Salomon', 'Islas Svalbard y Jan Mayen', 'Islas Turcas y Caicos', 'Islas Virgenes Americanas', 'Islas Virgenes Britanicas', 'Israel', 'Italia', 'Jamaica', 'Japon', 'Jersey', 'Jordania', 'Kazajistan', 'Kenia', 'Kirguisa', 'Kiribati', 'Kuwait', 'Laos', 'Lesoto', 'Letonia', 'Libano', 'Liberia', 'Libia', 'Liechtenstein', 'Lituania', 'Luxemburgo', 'Macao', 'Macedonia', 'Madagascar', 'Malasia', 'Malaui', 'Maldivas', 'Mali', 'Malta', 'Marianas del Norte ', 'Martinica', 'Mauricio', 'Mauritania', 'Mayotte', 'Mexico', 'Moldavia', 'Monaco', 'Mongolia', 'Montenegro', 'Montserrat', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Nicaragua', 'Niger', 'Nigeria', 'Niue', 'Noruega', 'Nueva Caledonia', 'Nueva Zelanda', 'Oman', 'Paises Bajos', 'Pakistan', 'Palaos', 'Palestina', 'Papua Nueva Guinea', 'Paraguay', 'Peru', 'Polinesia Francesa', 'Polonia', 'Portugal', 'Puerto Rico', 'Reino de Marruecos', 'Rep. Bolivariana de Venezuela', 'Rep. Corea (Sur)', 'Rep.Democratica del Congo ', 'Republica Centroafricana', 'Republica Checa', 'Republica de Eslovenia', 'Republica de Filipinas', 'Republica de Indonesia', 'Republica de Irlanda', 'Republica de la India', 'Republica de Panama', 'Republica de Sudafrica', 'Republica Dominicana', 'Republica Oriental del Uruguay', 'Reunion', 'Ruanda', 'Rumania', 'Rusia', 'Sahara Occidental', 'Samoa', 'Samoa Americana', 'San Cristobal y Nieves', 'San Marino', 'San Pedro y Miquelon', 'San Vicente y las Granadinas', 'Santa Elena', 'Santa Lucia', 'Santo Tome y Principe', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leona', 'Singapur', 'Siria', 'Somalia', 'Sri Lanka', 'Suazilandia', 'Sudan', 'Sudan del sur', 'Suecia', 'Suiza', 'Surinam', 'Tailandia', 'Taiwan', 'Tanzania', 'Tayikistan ', 'Terr. Británico del Oc. Indico', 'Tibet', 'Timor Oriental', 'Togo', 'Tokelau', 'Tonga', 'Trinidad y Tobago', 'Tunez', 'Turkmenistan', 'Turquia', 'Tuvalu', 'Ucrania', 'Uganda', 'Uzbekistan', 'Vanuatu', 'Vaticano', 'Vietnam', 'Wallis y Futuna', 'Yemen', 'Yibuti', 'Zambia', 'Zimbabue']
 }
 
@@ -163,6 +175,15 @@ st.markdown(
     }
     div[data-baseweb="tab-highlight"] { background-color: #FFFFFF !important; }
     div[data-baseweb="tab-border"] { display: none !important; background-color: transparent !important; }
+    
+    /* Estilo para el Chatbot en la Barra Lateral */
+    section[data-testid="stSidebar"] {
+        background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p,
+    section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] h1 {
+        color: #262730 !important; text-shadow: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -207,7 +228,6 @@ with tab_armador:
             opciones_formato = ["En una sola columna", "En dos columnas (1 Apellido, 1 Nombre)", "En múltiples columnas (Apellidos y Nombres partidos)"]
             formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido en el Excel original?", opciones_formato, horizontal=True)
             
-            # Variables default para todos los casos
             cols_apellido_multi = []
             cols_nombre_multi = []
             col_nombre_completo = "No incluir"
@@ -278,7 +298,7 @@ with tab_armador:
                     else:
                         nombres = [""] * len(df_crudo)
                         
-                else: # En múltiples columnas
+                else: 
                     if len(cols_apellido_multi) > 0:
                         apellidos = df_crudo[cols_apellido_multi].apply(
                             lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
@@ -636,7 +656,6 @@ with tab_unificador:
                             opciones_formato = ["En una sola columna", "En dos columnas (1 Apellido, 1 Nombre)", "En múltiples columnas (Apellidos y Nombres partidos)"]
                             formato_nombres = st.radio("¿Cómo vienen el Nombre y Apellido acá?", opciones_formato, horizontal=True, key=f"fmt_nom_unif_{idx_global}")
                             
-                            # Variables default para unificador
                             cols_apellido_multi = []
                             cols_nombre_multi = []
                             col_nombre_completo = "No incluir"
@@ -739,7 +758,7 @@ with tab_unificador:
                         else:
                             nombres = [""] * len(df_crudo)
                             
-                    else: # Múltiples columnas
+                    else: 
                         if len(cfg['cols_apellido_multi']) > 0:
                             apellidos = df_crudo[cfg['cols_apellido_multi']].apply(
                                 lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
@@ -967,3 +986,120 @@ with tab_cotizaciones:
             
     except Exception as e:
         st.error(f"Error al leer la carpeta de cotizaciones: {e}")
+
+# ==========================================
+# CHATBOT FLOTANTE EN LA BARRA LATERAL
+# ==========================================
+with st.sidebar:
+    st.title("💬 Asistente Virtual")
+    st.markdown("---")
+    
+    # 1. Función para manejar la lógica de estados
+    def procesar_respuesta_chat(user_input):
+        texto = user_input.strip()
+        step = st.session_state.chat_step
+        
+        # Volver al inicio rápido
+        if texto == "0":
+            st.session_state.chat_step = 0
+            return "¿En qué más te puedo ayudar?\n\n**1** - Cotizaciones\n**2** - Formularios\n**3** - Contactar un operador", None
+            
+        if step == 0:
+            if texto == "1":
+                st.session_state.chat_step = 1
+                return "¿Qué cotizaciones deseas?\n\n**1** - Viajes y excursiones / Actividades recreativas\n**2** - Colonia de vacaciones\n\n*(Escribí **0** para volver)*", None
+            elif texto == "2":
+                st.session_state.chat_step = 2
+                return "¿Qué formulario desea descargar?\n\n**1** - Declaración de beneficiario\n**2** - Solicitud de seguro\n**3** - Solicitud individual de incorporación\n**4** - Solicitud emisión de suplemento\n\n*(Escribí **0** para volver)*", None
+            elif texto == "3":
+                st.session_state.chat_step = 3
+                return "¿Con quién deseás comunicarte?\n\n**1** - Contactar a la casilla general de Accidentes Personales\n**2** - Contactar a un suscriptor\n\n*(Escribí **0** para volver)*", None
+            else:
+                return "Por favor, escribí un número válido (1, 2 o 3).", None
+                
+        elif step == 1: # Menu Cotizaciones
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "Acá tenés el tarifario de **Actividades Recreativas** (Opciones $4M, $5M y $6M). Buscá el archivo en la pestaña 'Cotizaciones' o en tu carpeta de archivos. ¿En qué más te ayudo? (1, 2 o 3)", "actividades recreativas.pdf"
+            elif texto == "2":
+                st.session_state.chat_step = 0
+                return "Acá tenés el tarifario de **Colonia de Vacaciones** (Reembolsos mensuales y prestacional). Buscá el archivo en la pestaña 'Cotizaciones'. ¿En qué más te ayudo? (1, 2 o 3)", "Colonia de vacaciones Mensual.pdf"
+            else:
+                return "Número inválido. Escribí 1 o 2 (o 0 para volver).", None
+                
+        elif step == 2: # Menu Formularios
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "Formulario de **Declaración de Beneficiarios**. Te recuerdo que completarlo agiliza el trámite de indemnización evitando la declaratoria de herederos. ¿En qué más te ayudo?", "Declaración de beneficiarios.pdf"
+            elif texto == "2":
+                st.session_state.chat_step = 0
+                return "Formulario de **Solicitud de Seguro** (Individual/Colectivo). Incluye datos del tomador, cuestionario y coberturas. ¿En qué más te ayudo?", "Solicitud de Seguro.pdf"
+            elif texto == "3":
+                st.session_state.chat_step = 0
+                return "Formulario de **Solicitud Individual de Incorporación**. Usalo para dar de alta a un asegurado dentro de un Seguro Colectivo. ¿En qué más te ayudo?", "Solc. indiv. incorp colectivo Acc. Pers.pdf"
+            elif texto == "4":
+                st.session_state.chat_step = 0
+                return "Formulario de **Solicitud Emisión de Suplemento**. Te servirá para dar de baja asegurados, modificar sumas o cambiar beneficiarios. ¿En qué más te ayudo?", "Solicitud Emision de suplemento.pdf"
+            else:
+                return "Número inválido. Escribí 1, 2, 3 o 4 (o 0 para volver).", None
+                
+        elif step == 3: # Menu Contacto General o Suscriptores
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "📧 Podés escribir a la casilla general: **suscripcionap@lasegunda.com.ar**\n\n¿En qué más te ayudo? (1, 2 o 3)", None
+            elif texto == "2":
+                st.session_state.chat_step = 4
+                return "¿A qué suscriptor querés contactar?\n\n**1** - Rocio Vielba\n**2** - Cecilia Jakimiuk\n**3** - Leonardo Catala\n**4** - Diego Rossi\n**5** - Rodrigo Beltrandi\n**6** - Federico Billone\n**7** - Martin Foresi\n**8** - Adrian Pauli\n\n*(Escribí **0** para volver)*", None
+            else:
+                return "Número inválido. Escribí 1 o 2 (o 0 para volver).", None
+
+        elif step == 4: # Lista de Suscriptores
+            suscriptores = {
+                "1": ("Rocio Vielba", "rvielba@lasegunda.com.ar"),
+                "2": ("Cecilia Jakimiuk", "cjakimiuk@lasegunda.com.ar"),
+                "3": ("Leonardo Catala", "lcatala@lasegunda.com.ar"),
+                "4": ("Diego Rossi", "drossi@lasegunda.com.ar"),
+                "5": ("Rodrigo Beltrandi", "rbeltrandi@lasegunda.com.ar"),
+                "6": ("Federico Billone", "fbillone@lasegunda.com.ar"),
+                "7": ("Martin Foresi", "mforesi@lasegunda.com.ar"),
+                "8": ("Adrian Pauli", "apauli@lasegunda.com.ar")
+            }
+            if texto in suscriptores:
+                nombre, correo = suscriptores[texto]
+                st.session_state.chat_step = 0
+                return f"📧 Podés contactar a **{nombre}** escribiendo a: **{correo}**\n\n¿En qué más te ayudo? (1, 2 o 3)", None
+            else:
+                return "Número inválido. Escribí del 1 al 8 (o 0 para volver).", None
+
+    # 2. Dibujar historial
+    for i, msg in enumerate(st.session_state.chat_history):
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+            # Si el bot adjuntó un archivo y existe en la carpeta local, mostramos el botón de descarga
+            if msg.get("file"):
+                file_path = os.path.join("cotizaciones", msg["file"])
+                if os.path.exists(file_path):
+                    with open(file_path, "rb") as f:
+                        st.download_button(
+                            label=f"📄 Descargar {msg['file']}",
+                            data=f,
+                            file_name=msg["file"],
+                            mime="application/pdf",
+                            key=f"download_chat_{i}"
+                        )
+                else:
+                    st.caption(f"*(Aviso: El archivo '{msg['file']}' tiene que estar guardado en la carpeta 'cotizaciones' de tu GitHub para poder descargarlo por acá).*")
+
+    # 3. Caja de texto para el usuario
+    if prompt := st.chat_input("Escribí un número..."):
+        # Guardar y mostrar lo que escribió el usuario
+        st.session_state.chat_history.append({"role": "user", "content": prompt, "file": None})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+            
+        # Procesar y mostrar la respuesta del bot
+        respuesta, archivo_adjunto = procesar_respuesta_chat(prompt)
+        st.session_state.chat_history.append({"role": "assistant", "content": respuesta, "file": archivo_adjunto})
+        
+        # Recargar la interfaz para mostrar el nuevo mensaje del bot
+        st.rerun()
