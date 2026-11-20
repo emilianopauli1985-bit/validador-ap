@@ -7,7 +7,7 @@ import re
 import string
 import os
 
-# Configuración inicial de la página
+# Configuración inicial de la página (¡Corregido!)
 st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
 
 # =========================================================
@@ -758,7 +758,7 @@ with tab_unificador:
                             apellidos = [""] * len(df_crudo)
                             
                         if len(cfg['cols_nombre_multi']) > 0:
-                            nombres = df_crudo[cfg['cols_nombre_multi']].apply(
+                            nombres = df_crudo[cols_nombre_multi].apply(
                                 lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
                             ).tolist()
                         else:
@@ -1124,6 +1124,14 @@ div[data-testid="stPopoverBody"] {
 /* Ocultar espacios vacíos propios de Streamlit dentro del popover */
 div[data-testid="stPopoverBody"] > div > div:first-child {
     gap: 0 !important;
+}
+/* --- SOLUCIÓN AL TEXTO BLANCO EN EL CHAT --- */
+/* Forzar texto oscuro para los mensajes dentro del chat */
+div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
+div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] em {
+    color: #333333 !important;
+    text-shadow: none !important;
 }
 /* 4. Estilos de la cabecera roja inventada */
 .chat-header {
