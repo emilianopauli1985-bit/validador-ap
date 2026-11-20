@@ -11,7 +11,7 @@ import os
 st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
 
 # =========================================================
-# VARIABLES DE MEMORIA (Para limpiar archivos y Chatbot)
+# VARIABLES DE MEMORIA 
 # =========================================================
 if 'reset_armador' not in st.session_state:
     st.session_state.reset_armador = 0
@@ -22,7 +22,7 @@ if 'reset_unificador' not in st.session_state:
 if 'reset_pdf' not in st.session_state:
     st.session_state.reset_pdf = 0
 
-# --- Memoria del Chatbot Flotante ---
+# --- Memoria del Asistente Virtual ---
 if "chat_history" not in st.session_state:
     mensaje_bienvenida = (
         "¡Hola! 👋 Soy tu Asistente Operativo. ¿En qué te puedo ayudar hoy?\n\n"
@@ -32,9 +32,7 @@ if "chat_history" not in st.session_state:
         "**3** - 📞 Contactar un operador"
     )
     st.session_state.chat_history = [{"role": "assistant", "content": mensaje_bienvenida, "file": None}]
-    st.session_state.chat_step = 0 
-if "chat_input_text" not in st.session_state:
-    st.session_state.chat_input_text = ""
+    st.session_state.chat_step = 0 # 0: Inicio, 1: Cotizaciones, 2: Formularios, 3: Contacto, 4: Suscriptores
 
 # =========================================================
 # LISTAS DESPLEGABLES EXTRAÍDAS DE LA PLANTILLA OFICIAL
@@ -133,7 +131,7 @@ def pintar_duplicados(s):
     dups = s.duplicated(keep=False) & (s != '')
     return ['background-color: #FFF2CC; color: #9C6500; font-weight: bold' if v else '' for v in dups]
 
-# Fondo de pantalla y estilos de contraste visual
+# Fondo de pantalla y estilos de contraste visual (Limpio, sin hacks CSS)
 st.markdown(
     """
     <style>
@@ -175,72 +173,19 @@ st.markdown(
     div[data-baseweb="tab-highlight"] { background-color: #FFFFFF !important; }
     div[data-baseweb="tab-border"] { display: none !important; background-color: transparent !important; }
     
-    /* --- CSS SEGURO PARA EL BOTÓN DEL CHAT --- */
-    /* Apuntamos SOLO al botón por su texto específico para evitar romper la página */
-    button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) {
-        position: fixed !important;
-        bottom: 30px !important;
-        right: 30px !important;
-        z-index: 999999 !important;
-        background-color: #e31837 !important;
-        border-radius: 50px !important;
-        height: 60px !important;
-        padding: 0 20px !important;
-        border: none !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;
-        transition: transform 0.2s;
-    }
-    button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")):hover {
-        transform: scale(1.05);
-    }
-    /* Estilizar el texto/icono del botón */
-    button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) p {
-        font-size: 20px !important;
-        color: white !important;
-        margin: 0 !important;
-        font-weight: bold !important;
-        text-shadow: none !important;
-    }
-    
-    /* 3. Estilizar la ventana del chat (Popover Body) */
-    div[data-testid="stPopoverBody"] {
-        width: 380px !important;
-        max-height: 600px !important;
-        min-height: 400px !important;
-        padding: 0 !important;
-        border-radius: 12px !important;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.3) !important;
-        border: 2px solid #a6192e !important;
-        background-color: white !important;
-        overflow: hidden !important;
-    }
-    /* Ocultar espacios vacíos propios de Streamlit dentro del popover */
-    div[data-testid="stPopoverBody"] > div > div:first-child {
-        gap: 0 !important;
-    }
-    
-    /* --- SOLUCIÓN AL TEXTO BLANCO EN EL CHAT --- */
-    div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
-    div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
-    div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] em {
+    /* Asegurar que los mensajes del chat en la pestaña se vean en color oscuro */
+    div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
+    div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] em {
         color: #333333 !important;
         text-shadow: none !important;
     }
-    
-    /* 4. Estilos de la cabecera roja inventada */
-    .chat-header {
-        background-color: #a6192e;
-        color: white;
-        padding: 15px;
-        text-align: center;
-        font-weight: bold;
-        font-size: 17px;
-        margin-bottom: 0;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-    /* 5. Cajas de input más limpias adentro del popover */
-    div[data-testid="stPopoverBody"] div[data-baseweb="input"] {
-        border-radius: 20px;
+    /* Estilizar contenedor de mensajes para que parezcan burbujas claras */
+    [data-testid="stChatMessage"] {
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 10px;
     }
     </style>
     """,
@@ -250,9 +195,9 @@ st.markdown(
 st.markdown('<h1 style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.6);">Asistente Operativo - Accidentes Personales</h1>', unsafe_allow_html=True)
 st.markdown('<p style="color: white; font-size: 18px; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); margin-bottom: 30px;">Seleccioná la herramienta que necesites usar hoy.</p>', unsafe_allow_html=True)
 
-# Solo las 5 pestañas principales
-tab_armador, tab_validador, tab_unificador, tab_pdf, tab_cotizaciones = st.tabs([
-    "🪄 Armar Excel", "✅ Validar Carga", "🔗 Unificar Excels", "📄 PDF a Excel / Word", "📚 Cotizaciones Frecuentes"
+# Incorporamos la Pestaña 6 para el Chat de forma natural
+tab_armador, tab_validador, tab_unificador, tab_pdf, tab_cotizaciones, tab_bot = st.tabs([
+    "🪄 Armar Excel", "✅ Validar Carga", "🔗 Unificar Excels", "📄 PDF a Excel / Word", "📚 Cotizaciones", "🤖 Asistente Virtual"
 ])
 
 # ==========================================
@@ -1046,206 +991,48 @@ with tab_cotizaciones:
     except Exception as e:
         st.error(f"Error al leer la carpeta de cotizaciones: {e}")
 
-
-# ==============================================================================
-# 🔴 BURBUJA DE CHATBOT FLOTANTE Y ESTILOS (Al estilo "La Segunda")
-# ==============================================================================
-
-# Lógica del chatbot
-def procesar_chat():
-    texto = st.session_state.chat_input_text.strip()
-    if not texto: return
+# ==========================================
+# PESTAÑA 6: ASISTENTE VIRTUAL (Nativo y Limpio)
+# ==========================================
+with tab_bot:
     
-    # Agregar pregunta del usuario al historial
-    st.session_state.chat_history.append({"role": "user", "content": texto, "file": None})
-    step = st.session_state.chat_step
-    
-    # Procesar respuesta del bot
-    respuesta = ""
-    archivo_adjunto = None
-    
-    if texto == "0":
-        st.session_state.chat_step = 0
-        respuesta = "¿En qué más te puedo ayudar?\n\n**1** - Cotizaciones\n**2** - Formularios\n**3** - Contactar un operador"
+    # Función para procesar la lógica de respuestas
+    def procesar_respuesta_chat(texto_usuario):
+        texto = texto_usuario.strip()
+        step = st.session_state.chat_step
         
-    elif step == 0:
-        if texto == "1":
-            st.session_state.chat_step = 1
-            respuesta = "¿Qué cotizaciones deseas?\n\n**1** - Viajes y excursiones / Actividades recreativas\n**2** - Colonia de vacaciones\n\n*(Escribí **0** para volver)*"
-        elif texto == "2":
-            st.session_state.chat_step = 2
-            respuesta = "¿Qué formulario desea descargar?\n\n**1** - Declaración de beneficiario\n**2** - Solicitud de seguro\n**3** - Solicitud individual de incorporación\n**4** - Solicitud emisión de suplemento\n\n*(Escribí **0** para volver)*"
-        elif texto == "3":
-            st.session_state.chat_step = 3
-            respuesta = "¿Con quién deseás comunicarte?\n\n**1** - Contactar a la casilla general de Accidentes Personales\n**2** - Contactar a un suscriptor\n\n*(Escribí **0** para volver)*"
-        else:
-            respuesta = "Por favor, escribí un número válido (1, 2 o 3)."
+        # Comando para volver siempre al menú inicial
+        if texto == "0":
+            st.session_state.chat_step = 0
+            return "¿En qué más te puedo ayudar?\n\n**1** - Cotizaciones\n**2** - Formularios\n**3** - Contactar un operador", None
             
-    elif step == 1:
-        if texto == "1":
-            st.session_state.chat_step = 0
-            respuesta = "Acá tenés el tarifario de **Actividades Recreativas**. ¿En qué más te ayudo? (1, 2 o 3)"
-            archivo_adjunto = "actividades recreativas.pdf"
-        elif texto == "2":
-            st.session_state.chat_step = 0
-            respuesta = "Acá tenés el tarifario de **Colonia de Vacaciones**. ¿En qué más te ayudo? (1, 2 o 3)"
-            archivo_adjunto = "Colonia de vacaciones Mensual.pdf"
-        else:
-            respuesta = "Número inválido. Escribí 1 o 2 (o 0 para volver)."
-            
-    elif step == 2:
-        if texto == "1":
-            st.session_state.chat_step = 0
-            respuesta = "Formulario de **Declaración de Beneficiarios**.\n*(Te recuerdo que completarlo agiliza el trámite de indemnización evitando la declaratoria de herederos)*.\n\n¿En qué más te ayudo?"
-            archivo_adjunto = "Declaración de beneficiarios.pdf"
-        elif texto == "2":
-            st.session_state.chat_step = 0
-            respuesta = "Formulario de **Solicitud de Seguro**.\n*(Sirve tanto para seguros Individuales como Colectivos)*.\n\n¿En qué más te ayudo?"
-            archivo_adjunto = "Solicitud de Seguro.pdf"
-        elif texto == "3":
-            st.session_state.chat_step = 0
-            respuesta = "Formulario de **Solicitud Individual de Incorporación**.\n*(Usalo para dar de alta a un asegurado dentro de un Seguro Colectivo)*.\n\n¿En qué más te ayudo?"
-            archivo_adjunto = "Solc. indiv. incorp colectivo Acc. Pers.pdf"
-        elif texto == "4":
-            st.session_state.chat_step = 0
-            respuesta = "Formulario de **Solicitud Emisión de Suplemento**.\n*(Te servirá para dar de baja asegurados, modificar sumas o cambiar beneficiarios mediante los Anexos A y B)*.\n\n¿En qué más te ayudo?"
-            archivo_adjunto = "Solicitud Emision de suplemento.pdf"
-        else:
-            respuesta = "Número inválido. Escribí del 1 al 4 (o 0 para volver)."
-            
-    elif step == 3:
-        if texto == "1":
-            st.session_state.chat_step = 0
-            respuesta = "📧 Podés escribir a la casilla general: **suscripcionap@lasegunda.com.ar**\n\n¿En qué más te ayudo? (1, 2 o 3)"
-        elif texto == "2":
-            st.session_state.chat_step = 4
-            respuesta = "¿A qué suscriptor querés contactar?\n\n**1** - Rocio Vielba\n**2** - Cecilia Jakimiuk\n**3** - Leonardo Catala\n**4** - Diego Rossi\n**5** - Rodrigo Beltrandi\n**6** - Federico Billone\n**7** - Martin Foresi\n**8** - Adrian Pauli\n\n*(Escribí **0** para volver)*"
-        else:
-            respuesta = "Número inválido. Escribí 1 o 2 (o 0 para volver)."
-
-    elif step == 4:
-        suscriptores = {
-            "1": ("Rocio Vielba", "rvielba@lasegunda.com.ar"),
-            "2": ("Cecilia Jakimiuk", "cjakimiuk@lasegunda.com.ar"),
-            "3": ("Leonardo Catala", "lcatala@lasegunda.com.ar"),
-            "4": ("Diego Rossi", "drossi@lasegunda.com.ar"),
-            "5": ("Rodrigo Beltrandi", "rbeltrandi@lasegunda.com.ar"),
-            "6": ("Federico Billone", "fbillone@lasegunda.com.ar"),
-            "7": ("Martin Foresi", "mforesi@lasegunda.com.ar"),
-            "8": ("Adrian Pauli", "apauli@lasegunda.com.ar")
-        }
-        if texto in suscriptores:
-            nombre, correo = suscriptores[texto]
-            st.session_state.chat_step = 0
-            respuesta = f"📧 Podés contactar a **{nombre}** escribiendo a: **{correo}**\n\n¿En qué más te ayudo? (1, 2 o 3)"
-        else:
-            respuesta = "Número inválido. Escribí del 1 al 8 (o 0 para volver)."
-            
-    st.session_state.chat_history.append({"role": "assistant", "content": respuesta, "file": archivo_adjunto})
-    st.session_state.chat_input_text = ""
-
-# --- INYECCIÓN DE CSS PARA MAGIA FLOTANTE ---
-st.markdown("""
-<style>
-/* --- CSS SEGURO PARA EL BOTÓN DEL CHAT --- */
-/* Apuntamos SOLO al botón específico del asistente para no romper la estructura de la app */
-button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) {
-    position: fixed !important;
-    bottom: 30px !important;
-    right: 30px !important;
-    z-index: 999999 !important;
-    background-color: #e31837 !important;
-    border-radius: 50px !important;
-    height: 60px !important;
-    padding: 0 20px !important;
-    border: none !important;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;
-    transition: transform 0.2s;
-}
-button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")):hover {
-    transform: scale(1.05);
-}
-/* Estilizar el texto/icono del botón */
-button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) p {
-    font-size: 20px !important;
-    color: white !important;
-    margin: 0 !important;
-    font-weight: bold !important;
-    text-shadow: none !important;
-}
-
-/* 3. Estilizar la ventana del chat (Popover Body) */
-div[data-testid="stPopoverBody"] {
-    width: 380px !important;
-    max-height: 600px !important;
-    min-height: 400px !important;
-    padding: 0 !important;
-    border-radius: 12px !important;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.3) !important;
-    border: 2px solid #a6192e !important;
-    background-color: white !important;
-    overflow: hidden !important;
-}
-/* Ocultar espacios vacíos propios de Streamlit dentro del popover */
-div[data-testid="stPopoverBody"] > div > div:first-child {
-    gap: 0 !important;
-}
-
-/* --- SOLUCIÓN AL TEXTO BLANCO EN EL CHAT --- */
-div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
-div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
-div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] em {
-    color: #333333 !important;
-    text-shadow: none !important;
-}
-
-/* 4. Estilos de la cabecera roja inventada */
-.chat-header {
-    background-color: #a6192e;
-    color: white;
-    padding: 15px;
-    text-align: center;
-    font-weight: bold;
-    font-size: 17px;
-    margin-bottom: 0;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-/* 5. Cajas de input más limpias adentro del popover */
-div[data-testid="stPopoverBody"] div[data-baseweb="input"] {
-    border-radius: 20px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# --- CREACIÓN DEL WIDGET (BOTÓN Y VENTANA) ---
-# Usamos un popover con un nombre único para que el CSS solo atrape a este botón
-popover = st.popover("💬 Asistente")
-
-with popover:
-    # Cabecera simulando la de la imagen
-    st.markdown('<div class="chat-header">La Segunda - ¿Cómo puedo ayudarte?</div>', unsafe_allow_html=True)
-    
-    # Área escrolleable para los mensajes
-    mensajes_container = st.container(height=380, border=False)
-    with mensajes_container:
-        for i, msg in enumerate(st.session_state.chat_history):
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+        if step == 0:
+            if texto == "1":
+                st.session_state.chat_step = 1
+                return "¿Qué cotizaciones deseas?\n\n**1** - Viajes y excursiones / Actividades recreativas\n**2** - Colonia de vacaciones\n\n*(Escribí **0** para volver al inicio)*", None
+            elif texto == "2":
+                st.session_state.chat_step = 2
+                return "¿Qué formulario desea descargar?\n\n**1** - Declaración de beneficiario\n**2** - Solicitud de seguro\n**3** - Solicitud individual de incorporación\n**4** - Solicitud emisión de suplemento\n\n*(Escribí **0** para volver al inicio)*", None
+            elif texto == "3":
+                st.session_state.chat_step = 3
+                return "¿Con quién deseás comunicarte?\n\n**1** - Contactar a la casilla general de Accidentes Personales\n**2** - Contactar a un suscriptor\n\n*(Escribí **0** para volver al inicio)*", None
+            else:
+                return "❌ Por favor, escribí un número válido (**1, 2 o 3**).", None
                 
-                # Botón de descarga si hay PDF adjunto
-                if msg.get("file"):
-                    file_path = os.path.join("cotizaciones", msg["file"])
-                    if os.path.exists(file_path):
-                        with open(file_path, "rb") as f:
-                            st.download_button(
-                                label=f"📄 Descargar PDF",
-                                data=f,
-                                file_name=msg["file"],
-                                mime="application/pdf",
-                                key=f"dl_btn_{i}"
-                            )
-                    else:
-                        st.caption(f"*(Falta subir '{msg['file']}' a la carpeta 'cotizaciones')*")
-    
-    # Caja de texto para escribir al bot
-    st.text_input("Escribí el número y presioná Enter...", key="chat_input_text", on_change=procesar_chat)
+        elif step == 1:
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "✅ Acá tenés el tarifario de **Actividades Recreativas**. *(Si tenés el archivo en tu carpeta de GitHub, aparecerá el botón para descargarlo debajo de este mensaje)*.\n\n¿En qué más te ayudo? (1, 2 o 3)", "actividades recreativas.pdf"
+            elif texto == "2":
+                st.session_state.chat_step = 0
+                return "✅ Acá tenés el tarifario de **Colonia de Vacaciones**. *(Si tenés el archivo en tu carpeta de GitHub, aparecerá el botón para descargarlo debajo de este mensaje)*.\n\n¿En qué más te ayudo? (1, 2 o 3)", "Colonia de vacaciones Mensual.pdf"
+            else:
+                return "❌ Número inválido. Escribí **1 o 2** (o **0** para volver al inicio).", None
+                
+        elif step == 2:
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Declaración de Beneficiarios**.\n\n💡 *Tip: Recordale al asegurado que completarlo agiliza el trámite de indemnización evitando la declaratoria de herederos.*\n\n¿En qué más te ayudo?", "Declaración de beneficiarios.pdf"
+            elif texto == "2":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Solicitud de Seguro**.\n\n💡 *Tip: Sir
