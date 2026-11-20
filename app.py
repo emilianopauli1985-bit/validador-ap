@@ -7,7 +7,7 @@ import re
 import string
 import os
 
-# Configuración inicial de la página (Limpio y centrado)
+# Configuración inicial de la página
 st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
 
 # =========================================================
@@ -26,13 +26,13 @@ if 'reset_pdf' not in st.session_state:
 if "chat_history" not in st.session_state:
     mensaje_bienvenida = (
         "¡Hola! 👋 Soy tu Asistente Operativo. ¿En qué te puedo ayudar hoy?\n\n"
-        "Escribí el **número** de la opción que necesites:\n"
-        "**1** - 📄 Cotizaciones\n"
-        "**2** - 📝 Formularios\n"
+        "Escribí el **número** de la opción que necesites:\n\n"
+        "**1** - 📄 Cotizaciones\n\n"
+        "**2** - 📝 Formularios\n\n"
         "**3** - 📞 Contactar un operador"
     )
     st.session_state.chat_history = [{"role": "assistant", "content": mensaje_bienvenida, "file": None}]
-    st.session_state.chat_step = 0 # 0: Inicio, 1: Cotizaciones, 2: Formularios, 3: Contacto, 4: Suscriptores
+    st.session_state.chat_step = 0 
 
 # =========================================================
 # LISTAS DESPLEGABLES EXTRAÍDAS DE LA PLANTILLA OFICIAL
@@ -173,19 +173,20 @@ st.markdown(
     div[data-baseweb="tab-highlight"] { background-color: #FFFFFF !important; }
     div[data-baseweb="tab-border"] { display: none !important; background-color: transparent !important; }
     
-    /* Asegurar que los mensajes del chat en la pestaña se vean en color oscuro */
+    /* Estilizar mensajes del chat para que sean globos bien legibles */
     div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
     div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
     div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] em {
-        color: #333333 !important;
+        color: #262730 !important;
         text-shadow: none !important;
     }
-    /* Estilizar contenedor de mensajes para que parezcan burbujas claras */
     [data-testid="stChatMessage"] {
         background-color: rgba(255, 255, 255, 0.95);
-        border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 10px;
+        border-radius: 15px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 5px solid #e31837; /* Detalle corporativo de La Segunda */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     </style>
     """,
@@ -992,7 +993,7 @@ with tab_cotizaciones:
         st.error(f"Error al leer la carpeta de cotizaciones: {e}")
 
 # ==========================================
-# PESTAÑA 6: ASISTENTE VIRTUAL (Nativo y Limpio)
+# PESTAÑA 6: ASISTENTE VIRTUAL (Centrado y Limpio)
 # ==========================================
 with tab_bot:
     
@@ -1004,28 +1005,28 @@ with tab_bot:
         # Comando para volver siempre al menú inicial
         if texto == "0":
             st.session_state.chat_step = 0
-            return "¿En qué más te puedo ayudar?\n\n**1** - Cotizaciones\n**2** - Formularios\n**3** - Contactar un operador", None
+            return "¿En qué más te puedo ayudar?\n\n**1** - 📄 Cotizaciones\n\n**2** - 📝 Formularios\n\n**3** - 📞 Contactar un operador", None
             
         if step == 0:
             if texto == "1":
                 st.session_state.chat_step = 1
-                return "¿Qué cotizaciones deseas?\n\n**1** - Viajes y excursiones / Actividades recreativas\n**2** - Colonia de vacaciones\n\n*(Escribí **0** para volver al inicio)*", None
+                return "¿Qué cotizaciones deseas?\n\n**1** - Viajes y excursiones / Actividades recreativas\n\n**2** - Colonia de vacaciones\n\n*(Escribí **0** para volver al inicio)*", None
             elif texto == "2":
                 st.session_state.chat_step = 2
-                return "¿Qué formulario desea descargar?\n\n**1** - Declaración de beneficiario\n**2** - Solicitud de seguro\n**3** - Solicitud individual de incorporación\n**4** - Solicitud emisión de suplemento\n\n*(Escribí **0** para volver al inicio)*", None
+                return "¿Qué formulario desea descargar?\n\n**1** - Declaración de beneficiario\n\n**2** - Solicitud de seguro\n\n**3** - Solicitud individual de incorporación\n\n**4** - Solicitud emisión de suplemento\n\n*(Escribí **0** para volver al inicio)*", None
             elif texto == "3":
                 st.session_state.chat_step = 3
-                return "¿Con quién deseás comunicarte?\n\n**1** - Contactar a la casilla general de Accidentes Personales\n**2** - Contactar a un suscriptor\n\n*(Escribí **0** para volver al inicio)*", None
+                return "¿Con quién deseás comunicarte?\n\n**1** - Contactar a la casilla general de Accidentes Personales\n\n**2** - Contactar a un suscriptor\n\n*(Escribí **0** para volver al inicio)*", None
             else:
                 return "❌ Por favor, escribí un número válido (**1, 2 o 3**).", None
                 
         elif step == 1:
             if texto == "1":
                 st.session_state.chat_step = 0
-                return "✅ Acá tenés el tarifario de **Actividades Recreativas**. *(Si tenés el archivo en tu carpeta de GitHub, aparecerá el botón para descargarlo debajo de este mensaje)*.\n\n¿En qué más te ayudo? (1, 2 o 3)", "actividades recreativas.pdf"
+                return "✅ Acá tenés el tarifario de **Actividades Recreativas**.\n\n¿En qué más te ayudo? (1, 2 o 3)", "actividades recreativas.pdf"
             elif texto == "2":
                 st.session_state.chat_step = 0
-                return "✅ Acá tenés el tarifario de **Colonia de Vacaciones**. *(Si tenés el archivo en tu carpeta de GitHub, aparecerá el botón para descargarlo debajo de este mensaje)*.\n\n¿En qué más te ayudo? (1, 2 o 3)", "Colonia de vacaciones Mensual.pdf"
+                return "✅ Acá tenés el tarifario de **Colonia de Vacaciones**.\n\n¿En qué más te ayudo? (1, 2 o 3)", "Colonia de vacaciones Mensual.pdf"
             else:
                 return "❌ Número inválido. Escribí **1 o 2** (o **0** para volver al inicio).", None
                 
@@ -1051,7 +1052,7 @@ with tab_bot:
                 return "📧 Podés escribir a la casilla general: **suscripcionap@lasegunda.com.ar**\n\n¿En qué más te ayudo? (1, 2 o 3)", None
             elif texto == "2":
                 st.session_state.chat_step = 4
-                return "¿A qué suscriptor querés contactar?\n\n**1** - Rocio Vielba\n**2** - Cecilia Jakimiuk\n**3** - Leonardo Catala\n**4** - Diego Rossi\n**5** - Rodrigo Beltrandi\n**6** - Federico Billone\n**7** - Martin Foresi\n**8** - Adrian Pauli\n\n*(Escribí **0** para volver al inicio)*", None
+                return "¿A qué suscriptor querés contactar?\n\n**1** - Rocio Vielba\n\n**2** - Cecilia Jakimiuk\n\n**3** - Leonardo Catala\n\n**4** - Diego Rossi\n\n**5** - Rodrigo Beltrandi\n\n**6** - Federico Billone\n\n**7** - Martin Foresi\n\n**8** - Adrian Pauli\n\n*(Escribí **0** para volver al inicio)*", None
             else:
                 return "❌ Número inválido. Escribí **1 o 2** (o **0** para volver al inicio).", None
 
@@ -1073,36 +1074,45 @@ with tab_bot:
             else:
                 return "❌ Número inválido. Escribí del **1 al 8** (o **0** para volver al inicio).", None
 
-    # --- Renderizar los mensajes del historial ---
-    for i, msg in enumerate(st.session_state.chat_history):
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    # Hacemos 3 columnas y usamos la del medio para que el chat no ocupe toda la pantalla
+    col_vacia1, col_chat, col_vacia2 = st.columns([1, 2, 1])
+    
+    with col_chat:
+        st.markdown('<div style="text-align: center; color: white; margin-bottom: 20px;">Escribí el número en la barra inferior para navegar por el menú.</div>', unsafe_allow_html=True)
+        
+        # --- Renderizar los mensajes del historial ---
+        for i, msg in enumerate(st.session_state.chat_history):
+            # Asignamos el icono de robot al bot y una silueta al humano
+            avatar_icon = "🤖" if msg["role"] == "assistant" else "👤"
             
-            # Si el mensaje del bot trae un archivo, mostramos el botón de descarga
-            if msg.get("file"):
-                file_path = os.path.join("cotizaciones", msg["file"])
-                if os.path.exists(file_path):
-                    with open(file_path, "rb") as f:
-                        st.download_button(
-                            label=f"📥 Descargar {msg['file']}",
-                            data=f,
-                            file_name=msg["file"],
-                            mime="application/pdf",
-                            key=f"dl_chat_{i}"
-                        )
-                else:
-                    st.error(f"⚠️ El archivo '{msg['file']}' no se encontró en la carpeta 'cotizaciones'.")
+            with st.chat_message(msg["role"], avatar=avatar_icon):
+                st.markdown(msg["content"])
+                
+                # Si el mensaje del bot trae un archivo, mostramos el botón de descarga
+                if msg.get("file"):
+                    file_path = os.path.join("cotizaciones", msg["file"])
+                    if os.path.exists(file_path):
+                        with open(file_path, "rb") as f:
+                            st.download_button(
+                                label=f"📥 Descargar {msg['file']}",
+                                data=f,
+                                file_name=msg["file"],
+                                mime="application/pdf",
+                                key=f"dl_chat_{i}"
+                            )
+                    else:
+                        st.error(f"⚠️ El archivo '{msg['file']}' no se encontró en la carpeta 'cotizaciones'.")
 
-    # --- Caja de texto inferior (Nativa de Streamlit) ---
-    if prompt := st.chat_input("Escribí un número acá..."):
-        # 1. Guardar y mostrar lo que escribió el usuario
-        st.session_state.chat_history.append({"role": "user", "content": prompt, "file": None})
-        
-        # 2. Procesar la lógica según el número ingresado
-        respuesta_bot, archivo_bot = procesar_respuesta_chat(prompt)
-        
-        # 3. Guardar la respuesta del bot
-        st.session_state.chat_history.append({"role": "assistant", "content": respuesta_bot, "file": archivo_bot})
-        
-        # 4. Refrescar la pantalla para ver el diálogo actualizado
-        st.rerun()
+        # --- Caja de texto inferior (Nativa de Streamlit) ---
+        if prompt := st.chat_input("Escribí un número acá..."):
+            # 1. Guardar y mostrar lo que escribió el usuario
+            st.session_state.chat_history.append({"role": "user", "content": prompt, "file": None})
+            
+            # 2. Procesar la lógica según el número ingresado
+            respuesta_bot, archivo_bot = procesar_respuesta_chat(prompt)
+            
+            # 3. Guardar la respuesta del bot
+            st.session_state.chat_history.append({"role": "assistant", "content": respuesta_bot, "file": archivo_bot})
+            
+            # 4. Refrescar la pantalla para ver el diálogo actualizado
+            st.rerun()
