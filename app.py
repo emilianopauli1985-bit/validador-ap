@@ -694,4 +694,442 @@ with tab_unificador:
                                 columnas_reales = list(df_tmp.columns)
                                 with c1:
                                     col_dni = st.selectbox("DNI o CUIL:", options=columnas_disponibles, key=f"dni3_{idx_global}")
-                                    col_fecha = st.selectbox("Fecha Nac.:", options=columnas_
+                                    col_fecha = st.selectbox("Fecha Nac.:", options=columnas_disponibles, key=f"fec3_{idx_global}")
+                                    col_id_persona = st.selectbox("ID (Opcional):", options=columnas_disponibles, key=f"id3_{idx_global}")
+                                with c2:
+                                    cols_apellido_multi = st.multiselect("Columnas de APELLIDO:", options=columnas_reales, key=f"apem_{idx_global}")
+                                with c3:
+                                    cols_nombre_multi = st.multiselect("Columnas de NOMBRE:", options=columnas_reales, key=f"nomm_{idx_global}")
+                                
+                            configs.append({
+                                'archivo': arch,
+                                'nombre_hoja': nombre_hoja,
+                                'fila_titulos': fila_titulos,
+                                'formato_nombres': formato_nombres,
+                                'col_dni': col_dni,
+                                'col_nombre_completo': col_nombre_completo,
+                                'col_apellido_sep': col_apellido_sep,
+                                'col_nombre_sep': col_nombre_sep,
+                                'cols_apellido_multi': cols_apellido_multi,
+                                'cols_nombre_multi': cols_nombre_multi,
+                                'col_fecha': col_fecha,
+                                'col_id_persona': col_id_persona
+                            })
+                        except Exception as e:
+                            st.error(f"Error leyendo la hoja '{nombre_hoja}'. Verificá la fila de títulos. Detalle: {e}")
+
+        if len(configs) == total_hojas_activas and total_hojas_activas > 0:
+            st.markdown("---")
+            if st.button("🔗 Consolidar Hojas y Generar Plantilla Oficial", use_container_width=True):
+                lista_dfs_limpios = []
+                tiene_id = any(cfg['col_id_persona'] != "No incluir" for cfg in configs)
+                
+                for cfg in configs:
+                    cfg['archivo'].seek(0)
+                    filas_a_saltar = int(cfg['fila_titulos']) - 1
+                    if cfg['archivo'].name.endswith('.csv'):
+                        df_crudo = pd.read_csv(cfg['archivo'], skiprows=filas_a_saltar)
+                    else:
+                        df_crudo = pd.read_excel(cfg['archivo'], sheet_name=cfg['nombre_hoja'], skiprows=filas_a_saltar)
+                    
+                    df_crudo = df_crudo.dropna(how='all')
+                    
+                    columnas_oficiales = ['Acción', '*Tipo Id.', '*Nro. Id.', '*Apellido', '*Nombre', '*Fecha de Nacimiento', '*S.A. Individual Muerte', 'S.A. Individual Inválidez', 'S.A. AMF', '*Incapacidad', '*Ocupación', '*Nacionalidad']
+                    if tiene_id:
+                        columnas_oficiales.insert(1, 'ID de Persona')
+                        
+                    df_oficial = pd.DataFrame(columns=columnas_oficiales)
+                    
+                    if tiene_id:
+                        if cfg['col_id_persona'] != "No incluir":
+                            df_oficial['ID de Persona'] = df_crudo[cfg['col_id_persona']].fillna("")
+                        else:
+                            df_oficial['ID de Persona'] = ""
+                            
+                    if cfg['col_dni'] != "No incluir":
+                        df_oficial['*Nro. Id.'] = df_crudo[cfg['col_dni']].apply(procesar_dni_cuil)
+                    
+                    apellidos = []
+                    nombres = []
+                    if cfg['formato_nombres'] == "En una sola columna":
+                        if cfg['col_nombre_completo'] != "No incluir":
+                            for nombre_completo in df_crudo[cfg['col_nombre_completo']]:
+                                ap, nom = procesar_nombre_compuesto(nombre_completo)
+                                apellidos.append(ap)
+                                nombres.append(nom)
+                        else:
+                            apellidos = [""] * len(df_crudo)
+                            nombres = [""] * len(df_crudo)
+                            
+                    elif cfg['formato_nombres'] == "En dos columnas (1 Apellido, 1 Nombre)":
+                        if cfg['col_apellido_sep'] != "No incluir":
+                            apellidos = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[cfg['col_apellido_sep']]]
+                        else:
+                            apellidos = [""] * len(df_crudo)
+                            
+                        if cfg['col_nombre_sep'] != "No incluir":
+                            nombres = [str(x).strip().upper() if pd.notna(x) and str(x).lower() != 'nan' else "" for x in df_crudo[cfg['col_nombre_sep']]]
+                        else:
+                            nombres = [""] * len(df_crudo)
+                            
+                    else: 
+                        if len(cfg['cols_apellido_multi']) > 0:
+                            apellidos = df_crudo[cfg['cols_apellido_multi']].apply(
+                                lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
+                            ).tolist()
+                        else:
+                            apellidos = [""] * len(df_crudo)
+                            
+                        if len(cfg['cols_nombre_multi']) > 0:
+                            nombres = df_crudo[cols_nombre_multi].apply(
+                                lambda row: ' '.join([str(val).strip().upper() for val in row if pd.notna(val) and str(val).strip().lower() != 'nan' and str(val).strip() != '']), axis=1
+                            ).tolist()
+                        else:
+                            nombres = [""] * len(df_crudo)
+
+                    df_oficial['*Apellido'] = apellidos
+                    df_oficial['*Nombre'] = nombres
+                    
+                    if cfg['col_fecha'] != "No incluir":
+                        fechas_limpias = []
+                        for f in df_crudo[cfg['col_fecha']]:
+                            if pd.isna(f) or str(f).lower() == 'nan':
+                                fechas_limpias.append("")
+                            elif isinstance(f, (pd.Timestamp, datetime)):
+                                fechas_limpias.append(f.date())
+                            else:
+                                f_str = str(f)
+                                nums = re.sub(r'[^0-9]', '', f_str)
+                                if len(nums) == 8:
+                                    try: fechas_limpias.append(pd.to_datetime(nums, format='%d%m%Y').date())
+                                    except: fechas_limpias.append(f_str)
+                                else:
+                                    fechas_limpias.append(f_str)
+                        df_oficial['*Fecha de Nacimiento'] = fechas_limpias
+
+                    df_oficial['Acción'] = 'Agregar'
+                    df_oficial['*Tipo Id.'] = 'D.N.I.'
+                    df_oficial['*Nacionalidad'] = 'Argentina'
+                    df_oficial['*Incapacidad'] = 'NO'
+                    
+                    lista_dfs_limpios.append(df_oficial)
+                
+                df_consolidado = pd.concat(lista_dfs_limpios, ignore_index=True)
+                
+                dnis_con_datos = df_consolidado[df_consolidado['*Nro. Id.'] != '']
+                cantidad_duplicados = dnis_con_datos.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first').sum()
+
+                if cantidad_duplicados > 0:
+                    m_vacios = df_consolidado['*Nro. Id.'] == ''
+                    m_duplicados = df_consolidado.duplicated(subset=['*Nro. Id.', '*Apellido', '*Nombre'], keep='first')
+                    df_consolidado = df_consolidado[m_vacios | (~m_duplicados)]
+                    df_consolidado.reset_index(drop=True, inplace=True)
+                    st.success(f"🪄 **Limpieza Automática Global:** Se unificaron las hojas y se eliminaron {cantidad_duplicados} registros idénticos.")
+                else:
+                    st.success("✅ Hojas fusionadas exitosamente.")
+                    
+                dnis_con_datos_final = df_consolidado[df_consolidado['*Nro. Id.'] != '']
+                cant_dup_parciales = dnis_con_datos_final.duplicated(subset=['*Nro. Id.'], keep=False).sum()
+
+                if cant_dup_parciales > 0:
+                    st.warning(f"⚠️ **¡Alerta de revisión!** Quedaron {cant_dup_parciales} registros con el mismo DNI pero distintos nombres entre las diferentes listas. Se pintaron de amarillo para que los analices.")
+                
+                st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
+                st.write("**Vista Previa del Archivo Unificado:**")
+                st.dataframe(df_consolidado.style.apply(pintar_duplicados, subset=['*Nro. Id.']))
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                buffer_unif = io.BytesIO()
+                
+                with pd.ExcelWriter(buffer_unif, engine='xlsxwriter', datetime_format='dd/mm/yyyy', date_format='dd/mm/yyyy') as writer:
+                    df_consolidado.to_excel(writer, index=False, sheet_name="AP - Personas x Grupo")
+                    workbook = writer.book
+                    worksheet = writer.sheets['AP - Personas x Grupo']
+                    inyectar_listas_desplegables(writer, df_consolidado, workbook, "AP - Personas x Grupo")
+                    
+                    idx_dni = list(df_consolidado.columns).index('*Nro. Id.')
+                    letra_col_dni = string.ascii_uppercase[idx_dni]
+                    rango_dni = f"{letra_col_dni}2:{letra_col_dni}5000"
+                    formula = f'=AND({letra_col_dni}2<>"", COUNTIF(${letra_col_dni}$2:${letra_col_dni}$5000,{letra_col_dni}2)>1)'
+                    
+                    formato_amarillo = workbook.add_format({'bg_color': '#FFF2CC', 'font_color': '#9C6500'})
+                    worksheet.conditional_format(rango_dni, {'type': 'formula', 'criteria': formula, 'format': formato_amarillo})
+                
+                col_u1, col_u2 = st.columns([1, 1])
+                with col_u1:
+                    st.download_button(
+                        label="📥 Descargar Plantilla Oficial Unificada",
+                        data=buffer_unif.getvalue(),
+                        file_name="AP_Personas_Unificado.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+                with col_u2:
+                    if st.button("🧹 Empezar de cero / Nueva Carga Múltiple", key="btn_unif", use_container_width=True):
+                        st.session_state.reset_unificador += 1
+                        st.rerun()
+
+# ==========================================
+# PESTAÑA 4: CONVERTIDOR DE PDF
+# ==========================================
+with tab_pdf:
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Subí la nómina en PDF. Si el sistema detecta una tabla estructurada, generará un <b>Excel</b>. Si solo detecta texto suelto, generará un archivo de <b>Word</b> para que te sea más fácil copiar y pegar los datos.</div>', unsafe_allow_html=True)
+    
+    col1c, col2c = st.columns([2, 3])
+    with col1c:
+        archivo_pdf = st.file_uploader("Subí el PDF del cliente", type=["pdf"], key=f"uploader_pdf_{st.session_state.reset_pdf}")
+    
+    if archivo_pdf is not None:
+        if st.button("🔍 Extraer Datos"):
+            try:
+                import pdfplumber
+                import docx
+            except ImportError:
+                st.error("❌ Faltan instalar librerías. Por favor, agregá las palabras 'pdfplumber' y 'python-docx' a tu archivo requirements.txt en GitHub (una debajo de la otra) y esperá a que la aplicación se reinicie.")
+            else:
+                with st.spinner("Escaneando PDF... esto puede demorar unos segundos."):
+                    todas_las_filas = []
+                    texto_crudo = []
+                    
+                    try:
+                        with pdfplumber.open(archivo_pdf) as pdf:
+                            for page in pdf.pages:
+                                tablas = page.extract_tables()
+                                if tablas:
+                                    for tabla in tablas:
+                                        tabla_limpia = [[str(celda).strip() if celda is not None else "" for celda in fila] for fila in tabla]
+                                        todas_las_filas.extend(tabla_limpia)
+                                
+                                texto = page.extract_text()
+                                if texto:
+                                    texto_crudo.extend(texto.split('\n'))
+                        
+                        st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; color: #262730 !important;">', unsafe_allow_html=True)
+                        
+                        if todas_las_filas:
+                            st.success("✅ ¡Se detectaron tablas estructuradas! Generando archivo Excel...")
+                            df_pdf = pd.DataFrame(todas_las_filas)
+                            st.write("**Vista Previa:**")
+                            st.dataframe(df_pdf.head(15))
+                            
+                            buffer_pdf = io.BytesIO()
+                            with pd.ExcelWriter(buffer_pdf, engine='xlsxwriter') as writer:
+                                df_pdf.to_excel(writer, index=False, header=False, sheet_name="Datos Extraídos")
+                                workbook = writer.book
+                                inyectar_listas_desplegables(writer, df_pdf, workbook, "Datos Extraídos")
+                            
+                            col_d1, col_d2 = st.columns([1, 1])
+                            with col_d1:
+                                st.download_button(
+                                    label="📥 Descargar Tabla en Excel",
+                                    data=buffer_pdf.getvalue(),
+                                    file_name="PDF_Convertido.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True
+                                )
+                            with col_d2:
+                                if st.button("🧹 Empezar de cero", key="btn_pdf_excel", use_container_width=True):
+                                    st.session_state.reset_pdf += 1
+                                    st.rerun()
+                            
+                        elif texto_crudo:
+                            st.warning("⚠️ El PDF no tenía formato de tabla. Se generó un archivo Word con el texto limpio para que puedas copiar y pegar.")
+                            
+                            doc = docx.Document()
+                            doc.add_heading('Texto extraído del PDF', 0)
+                            for linea in texto_crudo:
+                                if linea.strip(): 
+                                    doc.add_paragraph(linea.strip())
+                                    
+                            buffer_word = io.BytesIO()
+                            doc.save(buffer_word)
+                            
+                            col_d1, col_d2 = st.columns([1, 1])
+                            with col_d1:
+                                st.download_button(
+                                    label="📝 Descargar Texto en Word (.docx)",
+                                    data=buffer_word.getvalue(),
+                                    file_name="PDF_Texto_Extraido.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    use_container_width=True
+                                )
+                            with col_d2:
+                                if st.button("🧹 Empezar de cero", key="btn_pdf_word", use_container_width=True):
+                                    st.session_state.reset_pdf += 1
+                                    st.rerun()
+                        else:
+                            st.error("No se detectaron textos ni tablas. Es probable que el PDF sea una foto o imagen escaneada.")
+                            
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                    except Exception as e:
+                        st.error(f"Ocurrió un error inesperado al leer el PDF: {e}")
+
+# ==========================================
+# PESTAÑA 5: COTIZACIONES FRECUENTES
+# ==========================================
+with tab_cotizaciones:
+    st.markdown('<div style="background-color: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; margin-bottom: 20px; color: #262730 !important;">Descargá rápidamente las cotizaciones de referencia o tarifarios vigentes sin tener que buscarlos en tu PC.</div>', unsafe_allow_html=True)
+    
+    ruta_cotizaciones = "cotizaciones"
+    
+    try:
+        if os.path.exists(ruta_cotizaciones):
+            archivos_pdf = [f for f in os.listdir(ruta_cotizaciones) if f.lower().endswith('.pdf')]
+            
+            if archivos_pdf:
+                st.write("### 📄 Archivos disponibles:")
+                st.write("Hacé clic en cualquier botón para descargar el PDF:")
+                
+                columnas = st.columns(3)
+                
+                for index, archivo in enumerate(archivos_pdf):
+                    with open(os.path.join(ruta_cotizaciones, archivo), "rb") as pdf_file:
+                        col_actual = columnas[index % 3]
+                        col_actual.download_button(
+                            label=f"⬇️ {archivo.replace('.pdf', '')}",
+                            data=pdf_file,
+                            file_name=archivo,
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+            else:
+                st.info("ℹ️ La carpeta 'cotizaciones' existe, pero todavía no subiste ningún PDF adentro.")
+        else:
+            st.warning("⚠️ Todavía no se creó la carpeta **'cotizaciones'** en tu repositorio de GitHub. Mirá las instrucciones para activarla.")
+            
+    except Exception as e:
+        st.error(f"Error al leer la carpeta de cotizaciones: {e}")
+
+# ==========================================
+# PESTAÑA 6: ASISTENTE VIRTUAL (Centrado y Limpio)
+# ==========================================
+with tab_bot:
+    
+    # Función para procesar la lógica de respuestas
+    def procesar_respuesta_chat(texto_usuario):
+        texto = texto_usuario.strip()
+        step = st.session_state.chat_step
+        
+        # Comando para volver siempre al menú inicial
+        if texto == "0":
+            st.session_state.chat_step = 0
+            return "¿En qué más te puedo ayudar?\n\n**1** - 📄 Cotizaciones\n\n**2** - 📝 Formularios\n\n**3** - 📞 Contactar un operador", None
+            
+        if step == 0:
+            if texto == "1":
+                st.session_state.chat_step = 1
+                return "¿Qué cotizaciones deseas?\n\n**1** - Viajes y excursiones / Actividades recreativas\n\n**2** - Colonia de vacaciones\n\n*(Escribí **0** para volver al inicio)*", None
+            elif texto == "2":
+                st.session_state.chat_step = 2
+                return "¿Qué formulario desea descargar?\n\n**1** - Declaración de beneficiario\n\n**2** - Solicitud de seguro\n\n**3** - Solicitud individual de incorporación\n\n**4** - Solicitud emisión de suplemento\n\n*(Escribí **0** para volver al inicio)*", None
+            elif texto == "3":
+                st.session_state.chat_step = 3
+                return "¿Con quién deseás comunicarte?\n\n**1** - Contactar a la casilla general de Accidentes Personales\n\n**2** - Contactar a un suscriptor\n\n*(Escribí **0** para volver al inicio)*", None
+            else:
+                return "❌ Por favor, escribí un número válido (**1, 2 o 3**).", None
+                
+        elif step == 1:
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "✅ Acá tenés el tarifario de **Actividades Recreativas**.\n\n¿En qué más te ayudo? (1, 2 o 3)", "actividades recreativas.pdf"
+            elif texto == "2":
+                st.session_state.chat_step = 0
+                return "✅ Acá tenés el tarifario de **Colonia de Vacaciones**.\n\n¿En qué más te ayudo? (1, 2 o 3)", "Colonia de vacaciones Mensual.pdf"
+            else:
+                return "❌ Número inválido. Escribí **1 o 2** (o **0** para volver al inicio).", None
+                
+        elif step == 2:
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Declaración de Beneficiarios**.\n\n💡 *Tip: Recordale al asegurado que completarlo agiliza el trámite de indemnización evitando la declaratoria de herederos.*\n\n¿En qué más te ayudo?", "Declaración de beneficiarios.pdf"
+            elif texto == "2":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Solicitud de Seguro**.\n\n💡 *Tip: Sirve tanto para seguros Individuales como Colectivos.*\n\n¿En qué más te ayudo?", "Solicitud de Seguro.pdf"
+            elif texto == "3":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Solicitud Individual de Incorporación**.\n\n💡 *Tip: Usalo para dar de alta a un asegurado dentro de un Seguro Colectivo.*\n\n¿En qué más te ayudo?", "Solc. indiv. incorp colectivo Acc. Pers.pdf"
+            elif texto == "4":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Solicitud Emisión de Suplemento**.\n\n💡 *Tip: Te servirá para dar de baja asegurados, modificar sumas o cambiar beneficiarios mediante los Anexos A y B.*\n\n¿En qué más te ayudo?", "Solicitud Emision de suplemento.pdf"
+            else:
+                return "❌ Número inválido. Escribí del **1 al 4** (o **0** para volver al inicio).", None
+                
+        elif step == 3:
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "📧 Podés escribir a la casilla general: **suscripcionap@lasegunda.com.ar**\n\n¿En qué más te ayudo? (1, 2 o 3)", None
+            elif texto == "2":
+                st.session_state.chat_step = 4
+                return "¿A qué suscriptor querés contactar?\n\n**1** - Rocio Vielba\n\n**2** - Cecilia Jakimiuk\n\n**3** - Leonardo Catala\n\n**4** - Diego Rossi\n\n**5** - Rodrigo Beltrandi\n\n**6** - Federico Billone\n\n**7** - Martin Foresi\n\n**8** - Adrian Pauli\n\n*(Escribí **0** para volver al inicio)*", None
+            else:
+                return "❌ Número inválido. Escribí **1 o 2** (o **0** para volver al inicio).", None
+
+        elif step == 4:
+            suscriptores = {
+                "1": ("Rocio Vielba", "rvielba@lasegunda.com.ar"),
+                "2": ("Cecilia Jakimiuk", "cjakimiuk@lasegunda.com.ar"),
+                "3": ("Leonardo Catala", "lcatala@lasegunda.com.ar"),
+                "4": ("Diego Rossi", "drossi@lasegunda.com.ar"),
+                "5": ("Rodrigo Beltrandi", "rbeltrandi@lasegunda.com.ar"),
+                "6": ("Federico Billone", "fbillone@lasegunda.com.ar"),
+                "7": ("Martin Foresi", "mforesi@lasegunda.com.ar"),
+                "8": ("Adrian Pauli", "apauli@lasegunda.com.ar")
+            }
+            if texto in suscriptores:
+                nombre, correo = suscriptores[texto]
+                st.session_state.chat_step = 0
+                return f"📧 Podés contactar a **{nombre}** escribiendo a: **{correo}**\n\n¿En qué más te ayudo? (1, 2 o 3)", None
+            else:
+                return "❌ Número inválido. Escribí del **1 al 8** (o **0** para volver al inicio).", None
+
+    # Hacemos 3 columnas y usamos la del medio para que el chat no ocupe toda la pantalla
+    col_vacia1, col_chat, col_vacia2 = st.columns([1, 2, 1])
+    
+    with col_chat:
+        col_info, col_reset = st.columns([3, 1])
+        with col_info:
+            st.markdown('<div style="color: white; margin-bottom: 20px; margin-top: 10px;">Escribí el número en la barra inferior para navegar por el menú.</div>', unsafe_allow_html=True)
+        with col_reset:
+            # Botón mágico para resetear la memoria del chat
+            if st.button("🧹 Limpiar Chat", use_container_width=True):
+                st.session_state.chat_history = [{"role": "assistant", "content": mensaje_bienvenida, "file": None}]
+                st.session_state.chat_step = 0
+                st.rerun()
+        
+        # --- Renderizar los mensajes del historial ---
+        for i, msg in enumerate(st.session_state.chat_history):
+            # Asignamos el icono de robot al bot y una silueta al humano
+            avatar_icon = "🤖" if msg["role"] == "assistant" else "👤"
+            
+            with st.chat_message(msg["role"], avatar=avatar_icon):
+                st.markdown(msg["content"])
+                
+                # Si el mensaje del bot trae un archivo, mostramos el botón de descarga
+                if msg.get("file"):
+                    file_path = os.path.join("cotizaciones", msg["file"])
+                    if os.path.exists(file_path):
+                        with open(file_path, "rb") as f:
+                            st.download_button(
+                                label=f"📥 Descargar {msg['file']}",
+                                data=f,
+                                file_name=msg["file"],
+                                mime="application/pdf",
+                                key=f"dl_chat_{i}"
+                            )
+                    else:
+                        st.error(f"⚠️ El archivo '{msg['file']}' no se encontró en la carpeta 'cotizaciones'.")
+
+        # --- Caja de texto inferior (Nativa de Streamlit) ---
+        if prompt := st.chat_input("Escribí un número acá..."):
+            # 1. Guardar y mostrar lo que escribió el usuario
+            st.session_state.chat_history.append({"role": "user", "content": prompt, "file": None})
+            
+            # 2. Procesar la lógica según el número ingresado
+            respuesta_bot, archivo_bot = procesar_respuesta_chat(prompt)
+            
+            # 3. Guardar la respuesta del bot
+            st.session_state.chat_history.append({"role": "assistant", "content": respuesta_bot, "file": archivo_bot})
+            
+            # 4. Refrescar la pantalla para ver el diálogo actualizado
+            st.rerun()
