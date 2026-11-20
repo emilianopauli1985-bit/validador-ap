@@ -7,8 +7,8 @@ import re
 import string
 import os
 
-# Configuración inicial de la página (Fuerza el cierre de la barra lateral fantasma)
-st.set_page_config(page_title="Asistente Operativo - AP", layout="wide", initial_sidebar_state="collapsed")
+# Configuración inicial de la página (Limpio y centrado)
+st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
 
 # =========================================================
 # VARIABLES DE MEMORIA (Para limpiar archivos y Chatbot)
@@ -32,7 +32,7 @@ if "chat_history" not in st.session_state:
         "**3** - 📞 Contactar un operador"
     )
     st.session_state.chat_history = [{"role": "assistant", "content": mensaje_bienvenida, "file": None}]
-    st.session_state.chat_step = 0 # 0: Inicio, 1: Cotizaciones, 2: Formularios, 3: Contacto, 4: Suscriptores
+    st.session_state.chat_step = 0 
 if "chat_input_text" not in st.session_state:
     st.session_state.chat_input_text = ""
 
@@ -175,12 +175,72 @@ st.markdown(
     div[data-baseweb="tab-highlight"] { background-color: #FFFFFF !important; }
     div[data-baseweb="tab-border"] { display: none !important; background-color: transparent !important; }
     
-    /* ELIMINAR LA BARRA LATERAL FANTASMA POR COMPLETO */
-    [data-testid="collapsedControl"] {
-        display: none !important;
+    /* --- CSS SEGURO PARA EL BOTÓN DEL CHAT --- */
+    /* Apuntamos SOLO al botón por su texto específico para evitar romper la página */
+    button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) {
+        position: fixed !important;
+        bottom: 30px !important;
+        right: 30px !important;
+        z-index: 999999 !important;
+        background-color: #e31837 !important;
+        border-radius: 50px !important;
+        height: 60px !important;
+        padding: 0 20px !important;
+        border: none !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;
+        transition: transform 0.2s;
     }
-    section[data-testid="stSidebar"] {
-        display: none !important;
+    button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")):hover {
+        transform: scale(1.05);
+    }
+    /* Estilizar el texto/icono del botón */
+    button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) p {
+        font-size: 20px !important;
+        color: white !important;
+        margin: 0 !important;
+        font-weight: bold !important;
+        text-shadow: none !important;
+    }
+    
+    /* 3. Estilizar la ventana del chat (Popover Body) */
+    div[data-testid="stPopoverBody"] {
+        width: 380px !important;
+        max-height: 600px !important;
+        min-height: 400px !important;
+        padding: 0 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.3) !important;
+        border: 2px solid #a6192e !important;
+        background-color: white !important;
+        overflow: hidden !important;
+    }
+    /* Ocultar espacios vacíos propios de Streamlit dentro del popover */
+    div[data-testid="stPopoverBody"] > div > div:first-child {
+        gap: 0 !important;
+    }
+    
+    /* --- SOLUCIÓN AL TEXTO BLANCO EN EL CHAT --- */
+    div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
+    div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] em {
+        color: #333333 !important;
+        text-shadow: none !important;
+    }
+    
+    /* 4. Estilos de la cabecera roja inventada */
+    .chat-header {
+        background-color: #a6192e;
+        color: white;
+        padding: 15px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 17px;
+        margin-bottom: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    /* 5. Cajas de input más limpias adentro del popover */
+    div[data-testid="stPopoverBody"] div[data-baseweb="input"] {
+        border-radius: 20px;
     }
     </style>
     """,
@@ -1087,36 +1147,33 @@ def procesar_chat():
 # --- INYECCIÓN DE CSS PARA MAGIA FLOTANTE ---
 st.markdown("""
 <style>
-/* 1. Mover el popover (botón + ventana) a la esquina inferior derecha */
-div[data-testid="stVerticalBlock"]:has(#chatbot-marker) {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    z-index: 999999;
-    width: auto !important;
-}
-/* 2. Transformar el botón estándar en una burbuja roja circular gigante */
-div[data-testid="stVerticalBlock"]:has(#chatbot-marker) button[data-testid="baseButton-secondary"] {
+/* --- CSS SEGURO PARA EL BOTÓN DEL CHAT --- */
+/* Apuntamos SOLO al botón específico del asistente para no romper la estructura de la app */
+button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) {
+    position: fixed !important;
+    bottom: 30px !important;
+    right: 30px !important;
+    z-index: 999999 !important;
     background-color: #e31837 !important;
-    color: white !important;
-    border-radius: 50% !important;
-    height: 70px !important;
-    width: 70px !important;
+    border-radius: 50px !important;
+    height: 60px !important;
+    padding: 0 20px !important;
     border: none !important;
     box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;
-    padding: 0 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     transition: transform 0.2s;
 }
-div[data-testid="stVerticalBlock"]:has(#chatbot-marker) button[data-testid="baseButton-secondary"]:hover {
+button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")):hover {
     transform: scale(1.05);
 }
-div[data-testid="stVerticalBlock"]:has(#chatbot-marker) button[data-testid="baseButton-secondary"] p {
-    font-size: 35px !important;
+/* Estilizar el texto/icono del botón */
+button[data-testid="baseButton-secondary"]:has(div:contains("💬 Asistente")) p {
+    font-size: 20px !important;
+    color: white !important;
     margin: 0 !important;
+    font-weight: bold !important;
+    text-shadow: none !important;
 }
+
 /* 3. Estilizar la ventana del chat (Popover Body) */
 div[data-testid="stPopoverBody"] {
     width: 380px !important;
@@ -1133,14 +1190,15 @@ div[data-testid="stPopoverBody"] {
 div[data-testid="stPopoverBody"] > div > div:first-child {
     gap: 0 !important;
 }
+
 /* --- SOLUCIÓN AL TEXTO BLANCO EN EL CHAT --- */
-/* Forzar texto oscuro para los mensajes dentro del chat */
 div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
 div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
 div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] em {
     color: #333333 !important;
     text-shadow: none !important;
 }
+
 /* 4. Estilos de la cabecera roja inventada */
 .chat-header {
     background-color: #a6192e;
@@ -1156,51 +1214,38 @@ div[data-testid="stPopoverBody"] div[data-testid="stChatMessage"] div[data-testi
 div[data-testid="stPopoverBody"] div[data-baseweb="input"] {
     border-radius: 20px;
 }
-/* --- SOLUCIÓN AL ESPACIO FANTASMA --- */
-/* Ocultar el menú lateral por completo para recuperar el ancho de pantalla */
-[data-testid="collapsedControl"] {
-    display: none !important;
-}
-section[data-testid="stSidebar"] {
-    display: none !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
 # --- CREACIÓN DEL WIDGET (BOTÓN Y VENTANA) ---
-# Usamos un contenedor especial con un "marker" oculto para que el CSS lo encuentre
-widget_container = st.container()
-with widget_container:
-    st.markdown('<div id="chatbot-marker"></div>', unsafe_allow_html=True)
+# Usamos un popover con un nombre único para que el CSS solo atrape a este botón
+popover = st.popover("💬 Asistente")
+
+with popover:
+    # Cabecera simulando la de la imagen
+    st.markdown('<div class="chat-header">La Segunda - ¿Cómo puedo ayudarte?</div>', unsafe_allow_html=True)
     
-    # Botón burbuja (usamos el emoji de chat, el CSS lo hace circular y rojo)
-    popover = st.popover("💬")
+    # Área escrolleable para los mensajes
+    mensajes_container = st.container(height=380, border=False)
+    with mensajes_container:
+        for i, msg in enumerate(st.session_state.chat_history):
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                
+                # Botón de descarga si hay PDF adjunto
+                if msg.get("file"):
+                    file_path = os.path.join("cotizaciones", msg["file"])
+                    if os.path.exists(file_path):
+                        with open(file_path, "rb") as f:
+                            st.download_button(
+                                label=f"📄 Descargar PDF",
+                                data=f,
+                                file_name=msg["file"],
+                                mime="application/pdf",
+                                key=f"dl_btn_{i}"
+                            )
+                    else:
+                        st.caption(f"*(Falta subir '{msg['file']}' a la carpeta 'cotizaciones')*")
     
-    with popover:
-        # Cabecera simulando la de la imagen
-        st.markdown('<div class="chat-header">La Segunda - ¿Cómo puedo ayudarte?</div>', unsafe_allow_html=True)
-        
-        # Área escrolleable para los mensajes
-        mensajes_container = st.container(height=380, border=False)
-        with mensajes_container:
-            for i, msg in enumerate(st.session_state.chat_history):
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-                    
-                    # Botón de descarga si hay PDF adjunto
-                    if msg.get("file"):
-                        file_path = os.path.join("cotizaciones", msg["file"])
-                        if os.path.exists(file_path):
-                            with open(file_path, "rb") as f:
-                                st.download_button(
-                                    label=f"📄 Descargar PDF",
-                                    data=f,
-                                    file_name=msg["file"],
-                                    mime="application/pdf",
-                                    key=f"dl_btn_{i}"
-                                )
-                        else:
-                            st.caption(f"*(Falta subir '{msg['file']}' a la carpeta 'cotizaciones')*")
-        
-        # Caja de texto para escribir al bot
-        st.text_input("Escribí el número y presioná Enter...", key="chat_input_text", on_change=procesar_chat)
+    # Caja de texto para escribir al bot
+    st.text_input("Escribí el número y presioná Enter...", key="chat_input_text", on_change=procesar_chat)
