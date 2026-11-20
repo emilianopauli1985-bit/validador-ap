@@ -1035,4 +1035,74 @@ with tab_bot:
                 return "✅ Formulario de **Declaración de Beneficiarios**.\n\n💡 *Tip: Recordale al asegurado que completarlo agiliza el trámite de indemnización evitando la declaratoria de herederos.*\n\n¿En qué más te ayudo?", "Declaración de beneficiarios.pdf"
             elif texto == "2":
                 st.session_state.chat_step = 0
-                return "✅ Formulario de **Solicitud de Seguro**.\n\n💡 *Tip: Sir
+                return "✅ Formulario de **Solicitud de Seguro**.\n\n💡 *Tip: Sirve tanto para seguros Individuales como Colectivos.*\n\n¿En qué más te ayudo?", "Solicitud de Seguro.pdf"
+            elif texto == "3":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Solicitud Individual de Incorporación**.\n\n💡 *Tip: Usalo para dar de alta a un asegurado dentro de un Seguro Colectivo.*\n\n¿En qué más te ayudo?", "Solc. indiv. incorp colectivo Acc. Pers.pdf"
+            elif texto == "4":
+                st.session_state.chat_step = 0
+                return "✅ Formulario de **Solicitud Emisión de Suplemento**.\n\n💡 *Tip: Te servirá para dar de baja asegurados, modificar sumas o cambiar beneficiarios mediante los Anexos A y B.*\n\n¿En qué más te ayudo?", "Solicitud Emision de suplemento.pdf"
+            else:
+                return "❌ Número inválido. Escribí del **1 al 4** (o **0** para volver al inicio).", None
+                
+        elif step == 3:
+            if texto == "1":
+                st.session_state.chat_step = 0
+                return "📧 Podés escribir a la casilla general: **suscripcionap@lasegunda.com.ar**\n\n¿En qué más te ayudo? (1, 2 o 3)", None
+            elif texto == "2":
+                st.session_state.chat_step = 4
+                return "¿A qué suscriptor querés contactar?\n\n**1** - Rocio Vielba\n**2** - Cecilia Jakimiuk\n**3** - Leonardo Catala\n**4** - Diego Rossi\n**5** - Rodrigo Beltrandi\n**6** - Federico Billone\n**7** - Martin Foresi\n**8** - Adrian Pauli\n\n*(Escribí **0** para volver al inicio)*", None
+            else:
+                return "❌ Número inválido. Escribí **1 o 2** (o **0** para volver al inicio).", None
+
+        elif step == 4:
+            suscriptores = {
+                "1": ("Rocio Vielba", "rvielba@lasegunda.com.ar"),
+                "2": ("Cecilia Jakimiuk", "cjakimiuk@lasegunda.com.ar"),
+                "3": ("Leonardo Catala", "lcatala@lasegunda.com.ar"),
+                "4": ("Diego Rossi", "drossi@lasegunda.com.ar"),
+                "5": ("Rodrigo Beltrandi", "rbeltrandi@lasegunda.com.ar"),
+                "6": ("Federico Billone", "fbillone@lasegunda.com.ar"),
+                "7": ("Martin Foresi", "mforesi@lasegunda.com.ar"),
+                "8": ("Adrian Pauli", "apauli@lasegunda.com.ar")
+            }
+            if texto in suscriptores:
+                nombre, correo = suscriptores[texto]
+                st.session_state.chat_step = 0
+                return f"📧 Podés contactar a **{nombre}** escribiendo a: **{correo}**\n\n¿En qué más te ayudo? (1, 2 o 3)", None
+            else:
+                return "❌ Número inválido. Escribí del **1 al 8** (o **0** para volver al inicio).", None
+
+    # --- Renderizar los mensajes del historial ---
+    for i, msg in enumerate(st.session_state.chat_history):
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+            
+            # Si el mensaje del bot trae un archivo, mostramos el botón de descarga
+            if msg.get("file"):
+                file_path = os.path.join("cotizaciones", msg["file"])
+                if os.path.exists(file_path):
+                    with open(file_path, "rb") as f:
+                        st.download_button(
+                            label=f"📥 Descargar {msg['file']}",
+                            data=f,
+                            file_name=msg["file"],
+                            mime="application/pdf",
+                            key=f"dl_chat_{i}"
+                        )
+                else:
+                    st.error(f"⚠️ El archivo '{msg['file']}' no se encontró en la carpeta 'cotizaciones'.")
+
+    # --- Caja de texto inferior (Nativa de Streamlit) ---
+    if prompt := st.chat_input("Escribí un número acá..."):
+        # 1. Guardar y mostrar lo que escribió el usuario
+        st.session_state.chat_history.append({"role": "user", "content": prompt, "file": None})
+        
+        # 2. Procesar la lógica según el número ingresado
+        respuesta_bot, archivo_bot = procesar_respuesta_chat(prompt)
+        
+        # 3. Guardar la respuesta del bot
+        st.session_state.chat_history.append({"role": "assistant", "content": respuesta_bot, "file": archivo_bot})
+        
+        # 4. Refrescar la pantalla para ver el diálogo actualizado
+        st.rerun()
