@@ -7,7 +7,7 @@ import re
 import string
 import os
 
-# Configuración inicial de la página
+# Configuración inicial de la página (Limpio y centrado)
 st.set_page_config(page_title="Asistente Operativo - AP", layout="wide")
 
 # =========================================================
@@ -22,15 +22,17 @@ if 'reset_unificador' not in st.session_state:
 if 'reset_pdf' not in st.session_state:
     st.session_state.reset_pdf = 0
 
+# --- Mensaje inicial del Bot ---
+mensaje_bienvenida = (
+    "¡Hola! 👋 Soy tu Asistente Operativo. ¿En qué te puedo ayudar hoy?\n\n"
+    "Escribí el **número** de la opción que necesites:\n\n"
+    "**1** - 📄 Cotizaciones\n\n"
+    "**2** - 📝 Formularios\n\n"
+    "**3** - 📞 Contactar un operador"
+)
+
 # --- Memoria del Asistente Virtual ---
 if "chat_history" not in st.session_state:
-    mensaje_bienvenida = (
-        "¡Hola! 👋 Soy tu Asistente Operativo. ¿En qué te puedo ayudar hoy?\n\n"
-        "Escribí el **número** de la opción que necesites:\n\n"
-        "**1** - 📄 Cotizaciones\n\n"
-        "**2** - 📝 Formularios\n\n"
-        "**3** - 📞 Contactar un operador"
-    )
     st.session_state.chat_history = [{"role": "assistant", "content": mensaje_bienvenida, "file": None}]
     st.session_state.chat_step = 0 
 
@@ -1078,7 +1080,15 @@ with tab_bot:
     col_vacia1, col_chat, col_vacia2 = st.columns([1, 2, 1])
     
     with col_chat:
-        st.markdown('<div style="text-align: center; color: white; margin-bottom: 20px;">Escribí el número en la barra inferior para navegar por el menú.</div>', unsafe_allow_html=True)
+        col_info, col_reset = st.columns([3, 1])
+        with col_info:
+            st.markdown('<div style="color: white; margin-bottom: 20px; margin-top: 10px;">Escribí el número en la barra inferior para navegar por el menú.</div>', unsafe_allow_html=True)
+        with col_reset:
+            # Botón mágico para resetear la memoria del chat
+            if st.button("🧹 Limpiar Chat", use_container_width=True):
+                st.session_state.chat_history = [{"role": "assistant", "content": mensaje_bienvenida, "file": None}]
+                st.session_state.chat_step = 0
+                st.rerun()
         
         # --- Renderizar los mensajes del historial ---
         for i, msg in enumerate(st.session_state.chat_history):
